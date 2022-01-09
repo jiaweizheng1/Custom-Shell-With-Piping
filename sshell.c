@@ -42,6 +42,7 @@ int main(void)
 
                 /* Regular command */
                 retval = system(cmd);
+
                 fprintf(stderr, "Return status value for '%s': %d\n",
                         cmd, retval);
         }
