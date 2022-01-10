@@ -57,17 +57,18 @@ int main(void)
                 // Beginning of string parsing
                 //based on https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
                 char *args[17] = {};       // Specifications said maximum of 16 arguments so we can limit size of args array to save memory; 1 extra argument for NULL so execvp works properly for 16 arguments instructions
-                char cmd_cpy[CMDLINE_MAX]; //need a copy of cmd because strtok modifies the string in the first argument
+                char cmd_cpy[CMDLINE_MAX]; //need a copy of cmd because strtok function modifies the string in its first argument
 
                 strncpy(cmd_cpy, cmd, sizeof(cmd));
 
-                char delimiter[] = {" "};                  // We want to parse the string, ignoring all spaces
+                char delimiter[] = " >|";                  // We want to parse the string, ignoring all spaces, >, and |
                 char *wrdptr = strtok(cmd_cpy, delimiter); // ptr points to each word in the string
 
                 int i = 0; // Integer for selecting indexes in array args
                 while (wrdptr != NULL)
                 {
-                        args[i] = wrdptr;                 // Copy each word of cmd to args array
+                        args[i] = wrdptr; // Copy each word of cmd to args array
+                        //fprintf(stderr, "'%s'\n", args[i]); // For verifying correct parsing
                         wrdptr = strtok(NULL, delimiter); // First parameter is NULL so that strtok split the string from the next token's starting position.
                         i++;
                 }
@@ -76,7 +77,7 @@ int main(void)
                 // cd implementation
                 if (!strcmp(args[0], "cd"))
                 {
-                        chdir(args[1]); // Set process's working directory to file name
+                        chdir(args[1]); // Set process's working directory to file name specified by 2nd argument
                         continue;
                 }
 
@@ -94,8 +95,7 @@ int main(void)
                         retval = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
                 }
 
-                fprintf(stderr, "Return status value for '%s': %d\n", // Prints exit status of child
-                        cmd, retval);
+                fprintf(stderr, "Return status value for '%s': %d\n", cmd, retval); // Prints exit status of child
         }
 
         return EXIT_SUCCESS;
