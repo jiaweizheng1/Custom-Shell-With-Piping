@@ -6,8 +6,10 @@
 
 #define CMDLINE_MAX 512
 
-struct cmd
+struct outputred
 {
+        char metacharacter;
+        char file[];
 };
 
 int main(void)
@@ -45,7 +47,7 @@ int main(void)
                         break;
                 }
 
-                // Command pwd
+                // Built-in command pwd
                 if (!strcmp(cmd, "pwd")) //https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
                 {
                         getcwd(NULL, 0); // Prints out filename representing current directory. With arguments NULL and 0, getcwd automatically allocate a buffer larger enough to contain the filename.
@@ -59,7 +61,7 @@ int main(void)
 
                 strncpy(cmd_cpy, cmd, sizeof(cmd));
 
-                char delimiter[] = " ";                    // We want to parse the string, ignoring all spaces
+                char delimiter[] = {" "};                  // We want to parse the string, ignoring all spaces
                 char *wrdptr = strtok(cmd_cpy, delimiter); // ptr points to each word in the string
 
                 int i = 0; // Integer for selecting indexes in array args
@@ -79,18 +81,17 @@ int main(void)
                 }
 
                 // Regular command
-                pid_t pid;
-                pid = fork(); // Fork, creating child process
-                if (pid == 0) // Child
+                pid_t pid = fork(); // Fork, creating child process
+                if (pid == 0)       // Child
                 {
                         execvp(args[0], args); // Execvp so shell automatically search programs in $Path
                         exit(0);
                 }
                 else if (pid != 0) // Parent
                 {
-                        int status;
-                        waitpid(pid, &status, 0);     // Wait for child to finishing executing, then parent continue operation
-                        retval = WEXITSTATUS(status); // WEXITSTATUS gets exit status of child and puts it into retval
+                        int child_status;
+                        waitpid(pid, &child_status, 0);     // Wait for child to finishing executing, then parent continue operation
+                        retval = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
                 }
 
                 fprintf(stderr, "Return status value for '%s': %d\n", // Prints exit status of child
