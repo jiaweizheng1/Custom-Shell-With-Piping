@@ -43,60 +43,50 @@ int main(void)
 
                 // Regular command
                 pid_t pid;
-                char *args[16] = {}; //specifications said maximum of 16 arguments so we can limit size of args array to save memory
-                char *exec_program;  //initialize empty char for program to be executed
+                char *args[16] = {}; // Specifications said maximum of 16 arguments so we can limit size of args array to save memory
 
-                //beginning of string parsing
-                char cmd_cpy[CMDLINE_MAX];
+                // Beginning of string parsing
+                //based on https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
+                char cmd_cpy[CMDLINE_MAX]; //need a copy of cmd because strtok modifies the string in the first argument
 
                 strncpy(cmd_cpy, cmd, sizeof(cmd));
 
-                char delimiter[] = " ";
-                char *ptr = strtok(cmd_cpy, delimiter);
-                int i = 0;
+                char delimiter[] = " ";                 // We want to parse the string, ignoring all spaces
+                char *ptr = strtok(cmd_cpy, delimiter); // ptr points to each word in the string
 
+                int i = 0; // Interger for selecting indexes in array args
                 while (ptr != NULL)
                 {
-                        args[i] = ptr;
-                        ptr = strtok(NULL, delimiter);
+                        args[i] = ptr;                 // Copy each word of cmd to args array
+                        ptr = strtok(NULL, delimiter); // First parameter is NULL so that strtok split the string from the next token's starting position.
                         i++;
                 }
-                exec_program = args[0];
-                //end of string parsing
+                // End of string parsing
 
-                pid = fork(); // fork, creating child process
+                pid = fork(); // Fork, creating child process
                 if (pid == 0) // Child
                 {
-                        execvp(exec_program, args); //execvp so shell automatically search programs in $Path
+                        execvp(args[0], args); // Execvp so shell automatically search programs in $Path
                         exit(0);
                 }
                 else if (pid != 0) // Parent
                 {
                         int status;
-                        waitpid(pid, &status, 0);     // wait for child to finishing executing, then continue
-                        retval = WEXITSTATUS(status); // WEXITSTATUS gets exit status of child and puts into retval
+                        waitpid(pid, &status, 0);     // Wait for child to finishing executing, then parent continue operation
+                        retval = WEXITSTATUS(status); // WEXITSTATUS gets exit status of child and puts it into retval
                 }
 
-                fprintf(stderr, "Return status value for '%s': %d\n", // prints exit status of child
+                fprintf(stderr, "Return status value for '%s': %d\n", // Prints exit status of child
                         cmd, retval);
         }
 
         return EXIT_SUCCESS;
 }
-
-/*int cd(char *path)
+/*
+int cd(*path)
 {
-        if sizeof(argv) != 2 {
-                
-        }
-                printf()
-        }
-chdir(path);
+       printf("%s\n", getcwd(path, 100));
 }
-*/
-
-/*struct cmd{
-char command[50];
-cha
-}
-*/
+chdir("..");
+printf("New directory is '%c'\n", path);
+}*/
