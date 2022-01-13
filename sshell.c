@@ -29,10 +29,6 @@ int main(void)
                         fflush(stdout);
                 }
 
-                // Copy cmd for parsing
-                char cmd_cpy[CMDLINE_MAX]; //need a copy of cmd with newline for parsing
-                strcpy(cmd_cpy, cmd);
-
                 // Remove trailing newline from command line
                 nl = strchr(cmd, '\n');
                 if (nl)
@@ -56,75 +52,51 @@ int main(void)
                 // Start of process parsing
                 // with help from https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
                 // with help from https://stackoverflow.com/questions/12460264/c-determining-which-delimiter-used-strtok
-                char *processes[5];                     // up to 3 pipe signs or 4 processes + 1 output redirection
+                char cmd_cpy[CMDLINE_MAX]; //need a copy of cmd with newline for parsing
+                strcpy(cmd_cpy, cmd);
+                char *processes[512];                   // up to 3 pipe signs or 4 processes + 1 output redirection; 1 process only can be 512 characters
                 char process_seps[4][2];                // up to 3 pipe signs + 1 output redirection sign
                 char delimiter[] = ">|";                // We want to parse the string, ignoring all spaces, >, and |
                 char *ptr = strtok(cmd_cpy, delimiter); // ptr points to each process in the string
                 int num_processes = 0;                  // Integer for selecting indexes in processes array
-                int num_process_seps = -1;              // Integer for selecting indexes in process separators array
-                while (ptr != NULL)                     // keep parsing until end of user input
+                int num_process_seps = 0;               // Integer for selecting indexes in process separators array
+                while (1)                               // keep parsing until end of user input
                 {
-                        processes[num_processes] = ptr; // Copy each process of cmd to args array
-                        if (cmd[ptr - cmd_cpy + strlen(ptr)] == '>')
+                        if (ptr != NULL)
                         {
-                                num_process_seps++;
-                                strcpy(process_seps[num_process_seps], ">");
+                                processes[num_processes] = ptr;              // Copy each process of cmd to args array
+                                if (cmd[ptr - cmd_cpy + strlen(ptr)] == '>') // <------ I dont understand this part at all
+                                {
+                                        strcpy(process_seps[num_process_seps], ">");
+                                        num_process_seps++;
+                                }
+                                else
+                                {
+                                        strcpy(process_seps[num_process_seps], "|");
+                                        num_process_seps++;
+                                }
+                                ptr = strtok(NULL, delimiter);
+                                num_processes++;
+                                continue;
                         }
                         else
                         {
-                                num_process_seps++;
-                                strcpy(process_seps[num_process_seps], "|");
+                                break;
                         }
-                        ptr = strtok(NULL, delimiter);
-                        num_processes++;
                 }
-                for (int x = 0; x < num_processes; x++)
+                num_processes -= 1;
+                num_process_seps -= 1;
+                for (int x = 0; x <= num_processes; x++)
                 {
                         printf("%s\n", processes[x]);
                 }
-                for (int x = 0; x < num_process_seps; x++)
+                for (int x = 0; x <= num_process_seps; x++)
                 {
                         printf("%s\n", process_seps[x]);
                 }
-                /*
-                int num_processes = 0;
-                int num_process_seps = 0;
-                int j = 0;
-                char temp_string[512] = "";
-                for (int x = j; x <= (int)strlen(cmd_cpy); x++)
-                {
-                        if (cmd_cpy[x] == '>')
-                        {
-                                strcpy(processes[num_processes], temp_string);
-                                strcpy(process_seps[num_processes], ">");
-                                memset(temp_string, 0, sizeof(temp_string));
-                                num_processes++;
-                                num_process_seps++;
-                        }
-                        else if (cmd_cpy[x] == '|')
-                        {
-                                strcpy(processes[num_processes], temp_string);
-                                strcpy(process_seps[num_processes], "|");
-                                memset(temp_string, 0, sizeof(temp_string));
-                                num_processes++;
-                                num_process_seps++;
-                        }
-                        else if (cmd_cpy[x] == '\n')
-                        {
-                                strcpy(processes[num_processes], temp_string);
-                                memset(temp_string, 0, sizeof(temp_string));
-                                num_processes++;
-                        }
-                        else
-                        {
-                                strncat(temp_string, &cmd_cpy[x], 1);
-                        }
-                        //fprintf(stdout, "%d\n", cmd_cpy[i]);
-                }
-                */
                 // End of process parsing
 
-                // Start of argument parsing
+                // Start of argument parsing <-------------- should be made into a function later
                 int i = 0;
                 char *temp_process = processes[i];
                 char *args[16] = {"cd", "lol"};
