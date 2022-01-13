@@ -6,7 +6,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # This is free software: you are free to change and redistribute it.
 # There is NO WARRANTY, to the extent permitted by law.
 
-# Make data base, printed on Mon Jan 10 07:59:14 2022
+# Make data base, printed on Wed Jan 12 19:29:17 2022
 
 # Variables
 
@@ -47,7 +47,7 @@ VSCODE_NLS_CONFIG = {"locale":"en-us","availableLanguages":{},"_languagePackSupp
 # environment
 _ = /usr/share/code/code
 # environment
-JOURNAL_STREAM = 8:37438
+JOURNAL_STREAM = 8:37228
 # environment
 XDG_CONFIG_DIRS = /etc/xdg/xdg-ubuntu:/etc/xdg
 # makefile (from 'Makefile', line 1)
@@ -65,7 +65,7 @@ DBUS_SESSION_BUS_ADDRESS = unix:path=/run/user/1000/bus
 # environment
 VSCODE_VERBOSE_LOGGING = true
 # environment
-MANAGERPID = 1523
+MANAGERPID = 1464
 # environment
 LESSOPEN = | /usr/bin/lesspipe %s
 # environment
@@ -77,7 +77,7 @@ PATH = /usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin
 # environment
 GPG_AGENT_INFO = /run/user/1000/gnupg/S.gpg-agent:0:1
 # environment
-SESSION_MANAGER = local/jiawei-VirtualBox:@/tmp/.ICE-unix/1832,unix/jiawei-VirtualBox:/tmp/.ICE-unix/1832
+SESSION_MANAGER = local/jiawei-VirtualBox:@/tmp/.ICE-unix/1774,unix/jiawei-VirtualBox:/tmp/.ICE-unix/1774
 # environment
 XDG_RUNTIME_DIR = /run/user/1000
 # environment
@@ -89,7 +89,7 @@ VSCODE_LOG_STACK = false
 # environment
 VSCODE_CRASH_REPORTER_START_OPTIONS = {"companyName":"Microsoft","productName":"VSCode","submitURL":"appcenter://code?aid=fba07a4d-84bd-4fc8-a125-9640fc8ce171&uid=6a2d89a6-96eb-4cc6-bf8b-40060ab4916c&iid=6a2d89a6-96eb-4cc6-bf8b-40060ab4916c&sid=6a2d89a6-96eb-4cc6-bf8b-40060ab4916c","uploadToServer":true}
 # environment
-INVOCATION_ID = 2dbde445911c4c22b895ea87190c3366
+INVOCATION_ID = e99f3a5c457b45f1a2d4a3cbdc51f193
 # default
 .FEATURES := target-specific order-only second-expansion else-if shortest-stem undefine oneshell archives jobserver output-sync check-symlink load
 # environment
@@ -99,7 +99,7 @@ XDG_SESSION_DESKTOP = ubuntu
 # environment
 SSH_AUTH_SOCK = /run/user/1000/keyring/ssh
 # environment
-GIO_LAUNCHED_DESKTOP_FILE_PID = 2204
+GIO_LAUNCHED_DESKTOP_FILE_PID = 2146
 # automatic
 %F = $(notdir $%)
 # environment
@@ -111,7 +111,7 @@ PWD = /home/jiawei/Documents/ECS150/Project1
 # default
 .LOADED := 
 # environment
-SSH_AGENT_PID = 1746
+SSH_AGENT_PID = 1689
 # environment
 ORIGINAL_XDG_CURRENT_DESKTOP = ubuntu:GNOME
 # environment
@@ -147,7 +147,7 @@ SHLVL = 0
 # environment
 GNOME_SHELL_SESSION_MODE = ubuntu
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /run/user/1000/vscode-ipc-91ecc185-2215-4883-944d-3788cbee9d53.sock
+VSCODE_IPC_HOOK_EXTHOST = /run/user/1000/vscode-ipc-30dc9aa6-ff44-43bd-b9c9-0edb08121b34.sock
 # default
 MAKE_VERSION := 4.2.1
 # environment
@@ -209,7 +209,7 @@ GJS_DEBUG_OUTPUT = stderr
 # environment
 LANG = C
 # environment
-VSCODE_PID = 2204
+VSCODE_PID = 2146
 # variable set hash-table stats:
 # Load=100/1024=10%, Rehash=0, Collisions=14/128=11%
 
@@ -232,7 +232,7 @@ VSCODE_PID = 2204
 sshell: sshell.c
 #  Implicit rule search has not been done.
 #  Implicit/static pattern stem: ''
-#  Last modified 2022-01-09 20:56:39.734580797
+#  Last modified 2022-01-12 19:14:28.465741487
 #  File has been updated.
 #  Needs to be updated (-q is set).
 # automatic
@@ -279,9 +279,9 @@ all: sshell
 
 # Not a target:
 Makefile:
-#  Implicit rule search has been done.
  
-#  Last modified 2022-01-09 14:32:18.624334922
+#  Implicit rule search has been done.
+#  Last modified 2022-01-12 15:51:46.16907516
 #  File has been updated.
 #  Successfully updated.
 
@@ -297,7 +297,7 @@ update:
 # Not a target:
 sshell.c:
 #  Implicit rule search has been done.
-#  Last modified 2022-01-09 21:16:58.170640716
+#  Last modified 2022-01-12 19:16:33.80627994
 #  File has been updated.
 #  Successfully updated.
 
@@ -330,6 +330,6 @@ clean:
 # strcache performance: lookups = 38 / hit rate = 55%
 # hash-table stats:
 # Load=17/8192=0%, Rehash=0, Collisions=1/38=3%
-# Finished Make data base on Mon Jan 10 07:59:14 2022
+# Finished Make data base on Wed Jan 12 19:29:17 2022
 
  

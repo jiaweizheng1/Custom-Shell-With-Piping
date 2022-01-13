@@ -6,12 +6,6 @@
 
 #define CMDLINE_MAX 512
 
-struct outputred
-{
-        char metacharacter;
-        char file[];
-};
-
 int main(void)
 {
         char cmd[CMDLINE_MAX];
@@ -35,6 +29,10 @@ int main(void)
                         fflush(stdout);
                 }
 
+                // Copy cmd for parsing
+                char cmd_cpy[CMDLINE_MAX]; //need a copy of cmd with newline for parsing
+                strcpy(cmd_cpy, cmd);
+
                 // Remove trailing newline from command line
                 nl = strchr(cmd, '\n');
                 if (nl)
@@ -48,36 +46,107 @@ int main(void)
                 }
 
                 // Built-in command pwd
-                if (!strcmp(cmd, "pwd")) //https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
+                // with help from https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
+                if (!strcmp(cmd, "pwd"))
                 {
-                        getcwd(NULL, 0); // Prints out filename representing current directory. With arguments NULL and 0, getcwd automatically allocate a buffer larger enough to contain the filename.
+                        char file_name_buf[_PC_PATH_MAX];
+                        getcwd(file_name_buf, sizeof(file_name_buf)); // Prints out filename representing current directory.
                 }
 
-                // Other commands
-                // Beginning of string parsing
-                //based on https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
-                char *args[17] = {};       // Specifications said maximum of 16 arguments so we can limit size of args array to save memory; 1 extra argument for NULL so execvp works properly for 16 arguments instructions
-                char cmd_cpy[CMDLINE_MAX]; //need a copy of cmd because strtok function modifies the string in its first argument
-
-                strncpy(cmd_cpy, cmd, sizeof(cmd));
-
-                char delimiter[] = " >|";                  // We want to parse the string, ignoring all spaces, >, and |
-                char *wrdptr = strtok(cmd_cpy, delimiter); // ptr points to each word in the string
-
-                int i = 0; // Integer for selecting indexes in array args
-                while (wrdptr != NULL)
+                // Start of process parsing
+                // with help from https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
+                // with help from https://stackoverflow.com/questions/12460264/c-determining-which-delimiter-used-strtok
+                char *processes[5];                     // up to 3 pipe signs or 4 processes + 1 output redirection
+                char process_seps[4][2];                // up to 3 pipe signs + 1 output redirection sign
+                char delimiter[] = ">|";                // We want to parse the string, ignoring all spaces, >, and |
+                char *ptr = strtok(cmd_cpy, delimiter); // ptr points to each process in the string
+                int num_processes = 0;                  // Integer for selecting indexes in processes array
+                int num_process_seps = -1;              // Integer for selecting indexes in process separators array
+                while (ptr != NULL)                     // keep parsing until end of user input
                 {
-                        args[i] = wrdptr; // Copy each word of cmd to args array
-                        //fprintf(stderr, "'%s'\n", args[i]); // For verifying correct parsing
-                        wrdptr = strtok(NULL, delimiter); // First parameter is NULL so that strtok split the string from the next token's starting position.
+                        processes[num_processes] = ptr; // Copy each process of cmd to args array
+                        if (cmd[ptr - cmd_cpy + strlen(ptr)] == '>')
+                        {
+                                num_process_seps++;
+                                strcpy(process_seps[num_process_seps], ">");
+                        }
+                        else
+                        {
+                                num_process_seps++;
+                                strcpy(process_seps[num_process_seps], "|");
+                        }
+                        ptr = strtok(NULL, delimiter);
+                        num_processes++;
+                }
+                for (int x = 0; x < num_processes; x++)
+                {
+                        printf("%s\n", processes[x]);
+                }
+                for (int x = 0; x < num_process_seps; x++)
+                {
+                        printf("%s\n", process_seps[x]);
+                }
+                /*
+                int num_processes = 0;
+                int num_process_seps = 0;
+                int j = 0;
+                char temp_string[512] = "";
+                for (int x = j; x <= (int)strlen(cmd_cpy); x++)
+                {
+                        if (cmd_cpy[x] == '>')
+                        {
+                                strcpy(processes[num_processes], temp_string);
+                                strcpy(process_seps[num_processes], ">");
+                                memset(temp_string, 0, sizeof(temp_string));
+                                num_processes++;
+                                num_process_seps++;
+                        }
+                        else if (cmd_cpy[x] == '|')
+                        {
+                                strcpy(processes[num_processes], temp_string);
+                                strcpy(process_seps[num_processes], "|");
+                                memset(temp_string, 0, sizeof(temp_string));
+                                num_processes++;
+                                num_process_seps++;
+                        }
+                        else if (cmd_cpy[x] == '\n')
+                        {
+                                strcpy(processes[num_processes], temp_string);
+                                memset(temp_string, 0, sizeof(temp_string));
+                                num_processes++;
+                        }
+                        else
+                        {
+                                strncat(temp_string, &cmd_cpy[x], 1);
+                        }
+                        //fprintf(stdout, "%d\n", cmd_cpy[i]);
+                }
+                */
+                // End of process parsing
+
+                // Start of argument parsing
+                int i = 0;
+                char *temp_process = processes[i];
+                char *args[16] = {"cd", "lol"};
+                char arg_delimiter[] = " ";
+                char *argptr = strtok(temp_process, arg_delimiter);
+                i = 0;
+                while (argptr != NULL)
+                {
+                        args[i] = argptr;
+                        argptr = strtok(NULL, arg_delimiter);
                         i++;
                 }
-                // End of string parsing
+                // End of argument parsing
 
                 // cd implementation
                 if (!strcmp(args[0], "cd"))
                 {
-                        chdir(args[1]); // Set process's working directory to file name specified by 2nd argument
+                        if (chdir(args[1]) < 0) // Set process's working directory to file name specified by 2nd argument
+                        {
+                                fprintf(stderr, "Error: cannot cd into directory\n"); // error if not successful
+                                continue;
+                        }
                         continue;
                 }
 
@@ -85,8 +154,12 @@ int main(void)
                 pid_t pid = fork(); // Fork, creating child process
                 if (pid == 0)       // Child
                 {
-                        execvp(args[0], args); // Execvp so shell automatically search programs in $Path
-                        exit(0);
+                        if (execvp(args[0], args) < 0) // Set process's working directory to file name specified by 2nd argument
+                        {
+                                fprintf(stderr, "Error: command not found\n"); // error if not successful
+                                continue;
+                        }
+                        exit(0); // try to exit with exit successful flag
                 }
                 else if (pid != 0) // Parent
                 {
@@ -94,9 +167,16 @@ int main(void)
                         waitpid(pid, &child_status, 0);     // Wait for child to finishing executing, then parent continue operation
                         retval = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
                 }
-
                 fprintf(stderr, "Return status value for '%s': %d\n", cmd, retval); // Prints exit status of child
         }
 
         return EXIT_SUCCESS;
 }
+
+/*
+if (i > 15)
+{
+        fprintf(stderr, "Error: too many process arguments\n"); // error if too many arguments passed in through terminal
+        break;
+}
+*/
