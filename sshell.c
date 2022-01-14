@@ -6,6 +6,8 @@
 
 #define CMDLINE_MAX 512
 
+char *parseargsfunction(char *process, int *args_counter);
+
 int main(void)
 {
         char cmd[CMDLINE_MAX];
@@ -54,47 +56,92 @@ int main(void)
                 // with help from https://stackoverflow.com/questions/12460264/c-determining-which-delimiter-used-strtok
                 char cmd_cpy[CMDLINE_MAX]; //need a copy of cmd with newline for parsing
                 strcpy(cmd_cpy, cmd);
-                char *processes[512];                   // up to 3 pipe signs or 4 processes + 1 output redirection; 1 process only can be 512 characters
-                char process_seps[4][2];                // up to 3 pipe signs + 1 output redirection sign
-                char delimiter[] = ">|";                // We want to parse the string, ignoring all spaces, >, and |
-                char *ptr = strtok(cmd_cpy, delimiter); // ptr points to each process in the string
-                int num_processes = 0;                  // Integer for selecting indexes in processes array
-                int num_process_seps = 0;               // Integer for selecting indexes in process separators array
-                while (1)                               // keep parsing until end of user input
+                char *processes[CMDLINE_MAX]; // up to 3 pipe signs or 4 processes + 1 output redirection; only 1 process can be up to 512 characters; dynamic 2d ptr array
+                char process_seps[4][2];      // up to 3 pipe signs + 1 output redirection sign; 2d array
+                char delimiter[] = ">|";      // We want to parse the string, ignoring all spaces, >, and |
+                int num_processes = 0;        // Integer for selecting indexes in processes array
+                int num_process_seps = 0;     // Integer for selecting indexes in process separators array
+                int index_output_redirec = -1;
+                int expecting_one_file_arg = 0;
+                if (cmd[0] == '>')
                 {
-                        if (ptr != NULL)
+                        strcpy(process_seps[num_process_seps], ">");
+                        num_process_seps++;
+                        index_output_redirec = num_process_seps;
+                        expecting_one_file_arg = 1;
+                }
+                else if (cmd[0] == '|')
+                {
+                        strcpy(process_seps[num_process_seps], "|");
+                        num_process_seps++;
+                }
+                char *ptr = strtok(cmd_cpy, delimiter); // ptr points to each process in the string
+                while (ptr != NULL)                     // keep parsing until end of user input
+                {
+                        processes[num_processes] = ptr;              // Copy each process of cmd to args array
+                        if (cmd[ptr - cmd_cpy + strlen(ptr)] == '>') // <------ I dont understand this part at all
                         {
-                                processes[num_processes] = ptr;              // Copy each process of cmd to args array
-                                if (cmd[ptr - cmd_cpy + strlen(ptr)] == '>') // <------ I dont understand this part at all
-                                {
-                                        strcpy(process_seps[num_process_seps], ">");
-                                        num_process_seps++;
-                                }
-                                else
-                                {
-                                        strcpy(process_seps[num_process_seps], "|");
-                                        num_process_seps++;
-                                }
+                                strcpy(process_seps[num_process_seps], ">");
+                                num_process_seps++;
+                                index_output_redirec = num_process_seps;
+                                expecting_one_file_arg = 1;
                                 ptr = strtok(NULL, delimiter);
                                 num_processes++;
-                                continue;
+                        }
+                        else if (cmd[ptr - cmd_cpy + strlen(ptr)] == '|')
+                        {
+                                strcpy(process_seps[num_process_seps], "|");
+                                num_process_seps++;
+                                expecting_one_file_arg = 0;
+                                ptr = strtok(NULL, delimiter);
+                                num_processes++;
                         }
                         else
                         {
-                                break;
+                                expecting_one_file_arg = 0;
+                                ptr = strtok(NULL, delimiter);
+                                num_processes++;
                         }
                 }
-                num_processes -= 1;
-                num_process_seps -= 1;
-                for (int x = 0; x <= num_processes; x++)
+                for (int x = 0; x < num_processes; x++)
                 {
                         printf("%s\n", processes[x]);
                 }
-                for (int x = 0; x <= num_process_seps; x++)
+                for (int x = 0; x < num_process_seps; x++)
                 {
                         printf("%s\n", process_seps[x]);
                 }
+                printf("%d\n", num_processes);
+                printf("%d\n", num_process_seps);
                 // End of process parsing
+
+                // Some error checking
+                if (expecting_one_file_arg)
+                {
+                        fprintf(stderr, "Error: no output file\n");
+                        continue;
+                }
+                else if (index_output_redirec != -1 && index_output_redirec < num_process_seps)
+                {
+                        fprintf(stderr, "Error: mislocated output redirection\n");
+                        continue;
+                }
+                else if (cmd[0] != '\0' && num_process_seps >= num_processes)
+                {
+                        fprintf(stderr, "Error: missing command\n");
+                        continue;
+                }
+
+                int num_args = 0;
+                char *arg = (parseargsfunction(processes[0], &num_args));
+                printf("%s\n", arg);
+                /*
+                printf("%d\n", num_args);
+                for (int x = 0; x < num_args; x++)
+                {
+                        printf("%s\n", arg[x]);
+                }
+                */
 
                 // Start of argument parsing <-------------- should be made into a function later
                 int i = 0;
@@ -109,7 +156,6 @@ int main(void)
                         argptr = strtok(NULL, arg_delimiter);
                         i++;
                 }
-                // End of argument parsing
 
                 // cd implementation
                 if (!strcmp(args[0], "cd"))
@@ -143,6 +189,27 @@ int main(void)
         }
 
         return EXIT_SUCCESS;
+}
+
+char *parseargsfunction(char *process, int *args_counter)
+{
+
+        char *args[CMDLINE_MAX];
+        int index_args = 0;
+        char delimiter[] = " ";
+        char *ptr = strtok(process, delimiter);
+        while (ptr != NULL)
+        {
+                args[index_args] = ptr;
+                index_args++;
+                ptr = strtok(NULL, delimiter);
+        }
+        for (int x = 0; x < index_args; x++)
+        {
+                printf("%s\n", args[x]);
+        }
+        *args_counter += index_args;
+        return *args;
 }
 
 /*
