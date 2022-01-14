@@ -6,7 +6,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # This is free software: you are free to change and redistribute it.
 # There is NO WARRANTY, to the extent permitted by law.
 
-# Make data base, printed on Thu Jan 13 10:22:25 2022
+# Make data base, printed on Thu Jan 13 18:24:06 2022
 
 # Variables
 
@@ -47,7 +47,7 @@ VSCODE_NLS_CONFIG = {"locale":"en-us","availableLanguages":{},"_languagePackSupp
 # environment
 _ = /usr/share/code/code
 # environment
-JOURNAL_STREAM = 8:36583
+JOURNAL_STREAM = 8:35616
 # environment
 XDG_CONFIG_DIRS = /etc/xdg/xdg-ubuntu:/etc/xdg
 # makefile (from 'Makefile', line 1)
@@ -65,7 +65,7 @@ DBUS_SESSION_BUS_ADDRESS = unix:path=/run/user/1000/bus
 # environment
 VSCODE_VERBOSE_LOGGING = true
 # environment
-MANAGERPID = 1472
+MANAGERPID = 1466
 # environment
 LESSOPEN = | /usr/bin/lesspipe %s
 # environment
@@ -77,7 +77,7 @@ PATH = /usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin
 # environment
 GPG_AGENT_INFO = /run/user/1000/gnupg/S.gpg-agent:0:1
 # environment
-SESSION_MANAGER = local/jiawei-VirtualBox:@/tmp/.ICE-unix/1783,unix/jiawei-VirtualBox:/tmp/.ICE-unix/1783
+SESSION_MANAGER = local/jiawei-VirtualBox:@/tmp/.ICE-unix/1775,unix/jiawei-VirtualBox:/tmp/.ICE-unix/1775
 # environment
 XDG_RUNTIME_DIR = /run/user/1000
 # environment
@@ -89,7 +89,7 @@ VSCODE_LOG_STACK = false
 # environment
 VSCODE_CRASH_REPORTER_START_OPTIONS = {"companyName":"Microsoft","productName":"VSCode","submitURL":"appcenter://code?aid=fba07a4d-84bd-4fc8-a125-9640fc8ce171&uid=6a2d89a6-96eb-4cc6-bf8b-40060ab4916c&iid=6a2d89a6-96eb-4cc6-bf8b-40060ab4916c&sid=6a2d89a6-96eb-4cc6-bf8b-40060ab4916c","uploadToServer":true}
 # environment
-INVOCATION_ID = 050ff7251e2f43bfa5639d86246a063d
+INVOCATION_ID = 6036dc89c4034cd6a6fffa52e3067eea
 # default
 .FEATURES := target-specific order-only second-expansion else-if shortest-stem undefine oneshell archives jobserver output-sync check-symlink load
 # environment
@@ -99,7 +99,7 @@ XDG_SESSION_DESKTOP = ubuntu
 # environment
 SSH_AUTH_SOCK = /run/user/1000/keyring/ssh
 # environment
-GIO_LAUNCHED_DESKTOP_FILE_PID = 3036
+GIO_LAUNCHED_DESKTOP_FILE_PID = 2148
 # automatic
 %F = $(notdir $%)
 # environment
@@ -111,7 +111,7 @@ PWD = /home/jiawei/Documents/ECS150/Project1
 # default
 .LOADED := 
 # environment
-SSH_AGENT_PID = 1697
+SSH_AGENT_PID = 1690
 # environment
 ORIGINAL_XDG_CURRENT_DESKTOP = ubuntu:GNOME
 # environment
@@ -147,7 +147,7 @@ SHLVL = 0
 # environment
 GNOME_SHELL_SESSION_MODE = ubuntu
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /run/user/1000/vscode-ipc-0806f2d5-cbfd-4a40-a724-ed45de7300a5.sock
+VSCODE_IPC_HOOK_EXTHOST = /run/user/1000/vscode-ipc-16ccbcdf-cae0-4a0b-b179-d1ed6a1c4253.sock
 # default
 MAKE_VERSION := 4.2.1
 # environment
@@ -209,9 +209,9 @@ GJS_DEBUG_OUTPUT = stderr
 # environment
 LANG = C
 # environment
-VSCODE_PID = 3036
+VSCODE_PID = 2148
 # variable set hash-table stats:
-# Load=100/1024=10%, Rehash=0, Collisions=14/128=11%
+# Load=100/1024=10%, Rehash=0, Collisions=14/125=11%
 
 # Pattern-specific Variable Values
 
@@ -231,28 +231,9 @@ VSCODE_PID = 3036
 
 sshell: sshell.c
 #  Implicit rule search has not been done.
-#  Implicit/static pattern stem: ''
-#  Last modified 2022-01-12 21:02:21.487724163
+#  Last modified 2022-01-13 16:40:48.848541638
 #  File has been updated.
-#  Needs to be updated (-q is set).
-# automatic
-# @ := sshell
-# automatic
-# % := 
-# automatic
-# * := 
-# automatic
-# + := sshell.c
-# automatic
-# | := 
-# automatic
-# < := sshell.c
-# automatic
-# ^ := sshell.c
-# automatic
-# ? := sshell.c
-# variable set hash-table stats:
-# Load=8/32=25%, Rehash=0, Collisions=1/11=9%
+#  Successfully updated.
 #  recipe to execute (from 'Makefile', line 5):
 	gcc -Wall -Wextra -Werror sshell.c -o sshell
 
@@ -262,17 +243,9 @@ all: sshell
 #  Implicit rule search has not been done.
 #  File does not exist.
 #  File has been updated.
-#  Needs to be updated (-q is set).
-# variable set hash-table stats:
-# Load=0/32=0%, Rehash=0, Collisions=0/3=0%
+#  Successfully updated.
 
 .PHONY: all clean update
-#  Implicit rule search has not been done.
-#  Modification time never checked.
-#  File has not been updated.
-
-# Not a target:
-.SUFFIXES:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
@@ -296,13 +269,12 @@ update:
 # Not a target:
 sshell.c:
 #  Implicit rule search has been done.
-#  Last modified 2022-01-12 21:16:59.832893083
+#  Last modified 2022-01-13 16:40:47.444623456
 #  File has been updated.
 #  Successfully updated.
 
 # Not a target:
 .DEFAULT:
- 
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
@@ -312,12 +284,13 @@ clean:
 #  Implicit rule search has not been done.
 #  File does not exist.
 #  File has not been updated.
+ 
 #  recipe to execute (from 'Makefile', line 9):
 	rm sshell
 	rm *.txt
 
 # files hash-table stats:
-# Load=9/1024=1%, Rehash=0, Collisions=0/31=0%
+# Load=9/1024=1%, Rehash=0, Collisions=0/30=0%
 # VPATH Search Paths
 
 # No 'vpath' search paths.
@@ -327,9 +300,9 @@ clean:
 # strcache buffers: 1 (0) / strings = 17 / storage = 136 B / avg = 8 B
 # current buf: size = 8162 B / used = 136 B / count = 17 / avg = 8 B
 
-# strcache performance: lookups = 38 / hit rate = 55%
+# strcache performance: lookups = 37 / hit rate = 54%
 # hash-table stats:
-# Load=17/8192=0%, Rehash=0, Collisions=1/38=3%
-# Finished Make data base on Thu Jan 13 10:22:25 2022
+# Load=17/8192=0%, Rehash=0, Collisions=1/37=3%
+# Finished Make data base on Thu Jan 13 18:24:06 2022
 
  

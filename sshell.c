@@ -7,6 +7,7 @@
 #define CMDLINE_MAX 512
 
 char *parseargsfunction(char *process, int *args_counter);
+char *removeleadspaces(char *str, int *spacesremoved);
 
 int main(void)
 {
@@ -15,7 +16,7 @@ int main(void)
         while (1)
         {
                 char *nl;
-                int retval;
+                //int retval;
 
                 // Print prompt
                 printf("sshell$ ");
@@ -36,6 +37,12 @@ int main(void)
                 if (nl)
                         *nl = '\0';
 
+                // Get a copy of cmd for parsing
+                char *cmd_cpy;
+                int num_spaces = 0;
+                cmd_cpy = removeleadspaces(cmd, &num_spaces);
+                printf("%s\n", cmd_cpy);
+
                 // Builtin command exit
                 if (!strcmp(cmd, "exit"))
                 {
@@ -54,54 +61,77 @@ int main(void)
                 // Start of process parsing
                 // with help from https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
                 // with help from https://stackoverflow.com/questions/12460264/c-determining-which-delimiter-used-strtok
-                char cmd_cpy[CMDLINE_MAX]; //need a copy of cmd with newline for parsing
-                strcpy(cmd_cpy, cmd);
-                char *processes[CMDLINE_MAX]; // up to 3 pipe signs or 4 processes + 1 output redirection; only 1 process can be up to 512 characters; dynamic 2d ptr array
-                char process_seps[4][2];      // up to 3 pipe signs + 1 output redirection sign; 2d array
-                char delimiter[] = ">|";      // We want to parse the string, ignoring all spaces, >, and |
-                int num_processes = 0;        // Integer for selecting indexes in processes array
-                int num_process_seps = 0;     // Integer for selecting indexes in process separators array
+                char *processes[5];       // up to 3 pipe signs or 4 processes + 1 output redirection; only 1 process can be up to 512 characters; dynamic 2d ptr array
+                char process_seps[4][3];  // up to 3 pipe signs + 1 output redirection sign; 2d array
+                char delimiter[] = ">|&"; // We want to parse the string, ignoring all spaces, >, and |
+                int num_processes = 0;    // Integer for selecting indexes in processes array
+                int num_process_seps = 0; // Integer for selecting indexes in process separators array
                 int index_output_redirec = -1;
                 int expecting_one_file_arg = 0;
-                if (cmd[0] == '>')
+                char *ptr;
+                if (cmd_cpy[0] == '>')
                 {
-                        strcpy(process_seps[num_process_seps], ">");
+                        if (cmd_cpy[1] == '&')
+                        {
+                                strcpy(process_seps[num_process_seps], ">&");
+                        }
+                        else
+                        {
+                                strcpy(process_seps[num_process_seps], ">");
+                        }
                         num_process_seps++;
                         index_output_redirec = num_process_seps;
                         expecting_one_file_arg = 1;
                 }
-                else if (cmd[0] == '|')
+                else if (cmd_cpy[0] == '|')
                 {
-                        strcpy(process_seps[num_process_seps], "|");
+                        if (cmd_cpy[1] == '&')
+                        {
+                                strcpy(process_seps[num_process_seps], "|&");
+                        }
+                        else
+                        {
+                                strcpy(process_seps[num_process_seps], "|");
+                        }
                         num_process_seps++;
                 }
-                char *ptr = strtok(cmd_cpy, delimiter); // ptr points to each process in the string
-                while (ptr != NULL)                     // keep parsing until end of user input
+                ptr = strtok(cmd_cpy, delimiter); // ptr points to each process in the string
+                while (ptr != NULL)               // keep parsing until end of user input
                 {
-                        processes[num_processes] = ptr;              // Copy each process of cmd to args array
-                        if (cmd[ptr - cmd_cpy + strlen(ptr)] == '>') // <------ I dont understand this part at all
+                        processes[num_processes] = ptr;                           // Copy each process of cmd to args array
+                        if (cmd[num_spaces + ptr - cmd_cpy + strlen(ptr)] == '>') // <------ I dont understand this part at all
                         {
-                                strcpy(process_seps[num_process_seps], ">");
+                                if (cmd[num_spaces + ptr - cmd_cpy + strlen(ptr) + 1] == '&')
+                                {
+                                        strcpy(process_seps[num_process_seps], ">&");
+                                }
+                                else
+                                {
+                                        strcpy(process_seps[num_process_seps], ">");
+                                }
                                 num_process_seps++;
                                 index_output_redirec = num_process_seps;
                                 expecting_one_file_arg = 1;
-                                ptr = strtok(NULL, delimiter);
-                                num_processes++;
                         }
-                        else if (cmd[ptr - cmd_cpy + strlen(ptr)] == '|')
+                        else if (cmd[num_spaces + ptr - cmd_cpy + strlen(ptr)] == '|')
                         {
-                                strcpy(process_seps[num_process_seps], "|");
+                                if (cmd[num_spaces + ptr - cmd_cpy + strlen(ptr) + 1] == '&')
+                                {
+                                        strcpy(process_seps[num_process_seps], "|&");
+                                }
+                                else
+                                {
+                                        strcpy(process_seps[num_process_seps], "|");
+                                }
                                 num_process_seps++;
                                 expecting_one_file_arg = 0;
-                                ptr = strtok(NULL, delimiter);
-                                num_processes++;
                         }
                         else
                         {
                                 expecting_one_file_arg = 0;
-                                ptr = strtok(NULL, delimiter);
-                                num_processes++;
                         }
+                        ptr = strtok(NULL, delimiter);
+                        num_processes++;
                 }
                 for (int x = 0; x < num_processes; x++)
                 {
@@ -143,20 +173,8 @@ int main(void)
                 }
                 */
 
-                // Start of argument parsing <-------------- should be made into a function later
-                int i = 0;
-                char *temp_process = processes[i];
+                /*
                 char *args[16] = {"cd", "lol"};
-                char arg_delimiter[] = " ";
-                char *argptr = strtok(temp_process, arg_delimiter);
-                i = 0;
-                while (argptr != NULL)
-                {
-                        args[i] = argptr;
-                        argptr = strtok(NULL, arg_delimiter);
-                        i++;
-                }
-
                 // cd implementation
                 if (!strcmp(args[0], "cd"))
                 {
@@ -167,7 +185,9 @@ int main(void)
                         }
                         continue;
                 }
+                */
 
+                /*
                 // Regular command
                 pid_t pid = fork(); // Fork, creating child process
                 if (pid == 0)       // Child
@@ -186,6 +206,7 @@ int main(void)
                         retval = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
                 }
                 fprintf(stderr, "Return status value for '%s': %d\n", cmd, retval); // Prints exit status of child
+                */
         }
 
         return EXIT_SUCCESS;
@@ -194,7 +215,7 @@ int main(void)
 char *parseargsfunction(char *process, int *args_counter)
 {
 
-        char *args[CMDLINE_MAX];
+        char *args[16];
         int index_args = 0;
         char delimiter[] = " ";
         char *ptr = strtok(process, delimiter);
@@ -210,6 +231,27 @@ char *parseargsfunction(char *process, int *args_counter)
         }
         *args_counter += index_args;
         return *args;
+}
+
+// with help from https://www.geeksforgeeks.org/c-program-to-trim-leading-white-spaces-from-string/
+char *removeleadspaces(char *str, int *spacesremoved)
+{
+        static char ret_str[CMDLINE_MAX];
+        int count = 0;
+        int i;
+        int j;
+        while (str[count] == ' ') // iterate string until last leading space char
+        {
+                count++;
+        }
+
+        for (i = count, j = 0; str[i] != '\0'; i++, j++) // copy input string(without leading spaces) to return string
+        {
+                ret_str[j] = str[i];
+        }
+        ret_str[j] = '\0'; // add newline on last index to signify end of string
+        *spacesremoved += count;
+        return ret_str;
 }
 
 /*
