@@ -8,8 +8,3 @@ sshell: sshell.c
 clean:
 	rm sshell
 	rm *.txt
-
-.PHONY: update
-update:
-	make clean
-	make all
