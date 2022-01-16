@@ -1,22 +1,28 @@
+/* TO DO
+-implement: echo hello > file world
+-fix makefile
+-report
+-file name is not a argument wtf
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h> // to access waitpid function
 #include <unistd.h>
 
-/* TO DO
--rename dumbass names like ptr
--implement: echo hello > file world
--fix makefile
--report
-*/
-
 #define CMDLINE_MAX 512
-#define PROCESS_MAX 5  // up to 3 pipe signs or 4 processes + 1 output redirection
-#define METACHAR_MAX 4 // up to 3 pipe signs + 1 output redirection sign;
-#define ARGS_MAX 16    // base on specifications
+#define PROCESS_MAX 16  // up to 3 pipe signs or 4 processes + 1 output redirection but can just have only multiple output redirections
+#define METACHAR_MAX 16 // up to 3 pipe signs + 1 output redirection sign but can just have multiple linked > or >&
+#define ARGS_MAX 16     // base on specifications
 
-void *parseargsfunction(char *process, char *arg_array, int *args_counter)
+struct mystruct
+{
+        char my_process_args[ARGS_MAX];
+        int my_num_items;
+};
+
+int argsfunction(char *process, char *arg_array[ARGS_MAX])
 {
         int index_args = 0;
         char delimiter[] = " ";
@@ -24,17 +30,15 @@ void *parseargsfunction(char *process, char *arg_array, int *args_counter)
         ptr_args = strtok(process, delimiter);
         while (ptr_args != NULL)
         {
-                arg_array[index_args] = *ptr_args;
+                arg_array[index_args] = ptr_args;
                 index_args++;
                 ptr_args = strtok(NULL, delimiter);
         }
         for (int x = 0; x < index_args; x++)
         {
-                printf("%s\n", &arg_array[x]);
+                printf("%s\n", arg_array[x]);
         }
-        *args_counter += index_args;
-
-        return 0;
+        return index_args;
 }
 
 // with help from https://www.geeksforgeeks.org/c-program-to-trim-leading-white-spaces-from-string/
@@ -48,7 +52,6 @@ char *removeleadspaces(char *str, int *spacesremoved)
         {
                 num_spaces++;
         }
-
         for (str_index = num_spaces, ret_str_index = 0; str[str_index] != '\0'; str_index++, ret_str_index++) // copy input string(without leading spaces) to return string
         {
                 ret_str[ret_str_index] = str[str_index];
@@ -145,7 +148,7 @@ int main(void)
 
                 // built-in command pwd
                 // with help from https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
-                if (!strcmp(cmd, "pwd"))
+                else if (!strcmp(cmd, "pwd"))
                 {
                         char file_name_buf[_PC_PATH_MAX];
                         getcwd(file_name_buf, sizeof(file_name_buf)); // Prints out filename representing current directory.
@@ -154,18 +157,21 @@ int main(void)
                 // start of process + meta character parsing
                 // with help from https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
                 // with help from https://stackoverflow.com/questions/12460264/c-determining-which-delimiter-used-strtok
-                char *processes[PROCESS_MAX];  // 2d array for holding processes
-                char *metachar[METACHAR_MAX];  // 2d array for holding meta characters
-                char delimiter[] = ">|";       // We want to parse the string, ignoring all spaces, >, and |
-                int num_processes = 0;         // integer for selecting indexes in processes array
-                int num_metachar = 0;          // integer for selecting indexes in process separators array
-                int index_output_redirec = -1; // initially, not set; we dont know yet if instruction includes output redirection
-                int expect_file_arg = 0;       // boolean for checking file name after usage of > or >&; 0 false and 1 true
+                char *processes[PROCESS_MAX];              // array of processes + output redirection or many output redirections
+                char *process_args[PROCESS_MAX][ARGS_MAX]; // array of array of args(broken down from process)
+                char *metachar[METACHAR_MAX];              // array of strings for holding meta characters
+                char delimiter[] = ">|";                   // We want to parse the string, ignoring all spaces, >, and |
+                int num_processes = 0;                     // integer for selecting indexes in processes array
+                int num_metachar = 0;                      // integer for selecting indexes in process separators array
+                int num_output_redirec_signs = 0;
+                int num_pipesigns = 0;
+                int index_last_output_redirec = -1; // initially, not set; we dont know yet if instruction includes output redirection
+                int expect_file_arg = 0;            // boolean for checking file name after usage of > or >&; 0 false and 1 true
                 int ERROR_THROWN = 0;
                 char *ptr_process;
                 char *ptr_metachar;
 
-                // first error checking
+                // initial error checking
                 if (cmd_cpy[0] == '>' || cmd_cpy[0] == '|')
                 {
                         error_message(ERR_MISSING_CMD);
@@ -182,7 +188,7 @@ int main(void)
                         ptr_process = strtok(cmd_cpy, delimiter); // ptr_process points to each process in the string
                         while (ptr_process != NULL)               // keep parsing until end of user input
                         {
-                                processes[num_processes] = ptr_process; // copy each process of cmd to args array
+                                processes[num_processes] = ptr_process; // copy each process of cmd_copy to args array
 
                                 if (processes[num_processes][0] == '&') // replace & with space if index 0 of process is &;because our delimiter is only > and |
                                 {
@@ -200,14 +206,16 @@ int main(void)
                                         {
                                                 ptr_metachar = ">&";
                                                 metachar[num_metachar] = ptr_metachar;
+                                                num_output_redirec_signs++;
                                         }
                                         else
                                         {
                                                 ptr_metachar = ">";
                                                 metachar[num_metachar] = ptr_metachar;
+                                                num_output_redirec_signs++;
                                         }
                                         num_metachar++;
-                                        index_output_redirec = num_metachar;
+                                        index_last_output_redirec = num_metachar;
                                         expect_file_arg = 1;
                                 }
                                 else if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)] == '|')
@@ -221,11 +229,13 @@ int main(void)
                                         {
                                                 ptr_metachar = "|&";
                                                 metachar[num_metachar] = ptr_metachar;
+                                                num_pipesigns++;
                                         }
                                         else
                                         {
                                                 ptr_metachar = "|";
                                                 metachar[num_metachar] = ptr_metachar;
+                                                num_pipesigns++;
                                         }
                                         num_metachar++;
                                         expect_file_arg = 0;
@@ -258,68 +268,67 @@ int main(void)
                         error_message(ERR_MISSING_FILE);
                         ERROR_THROWN = 1;
                 }
-                else if (ERROR_THROWN == 0 && index_output_redirec != -1 && index_output_redirec < num_metachar)
+                if (ERROR_THROWN == 0 && index_last_output_redirec != -1 && index_last_output_redirec < num_metachar)
                 {
                         error_message(ERR_MISLOCATE_OUT_REDIRECTION);
                         ERROR_THROWN = 1;
                 }
-                else if (ERROR_THROWN == 0 && num_metachar >= num_processes)
+                if (ERROR_THROWN == 0 && num_metachar >= num_processes)
                 {
                         error_message(ERR_MISSING_CMD);
                         ERROR_THROWN = 1;
                 }
 
-                /*
-                int num_args = 0;
-                char *arg = (parseargsfunction(processes[0], &num_args));
-                printf("%s\n", arg);
-                */
-                /*
-                printf("%d\n", num_args);
-                for (int x = 0; x < num_args; x++)
+                if (ERROR_THROWN == 0)
                 {
-                        printf("%s\n", arg[x]);
-                }
-                */
+                        // args parsing
+                        int num_args = 0;
 
-                /*
-                char *args[16] = {"cd", "lol"};
-                // cd implementation
-                if (!strcmp(args[0], "cd"))
-                {
-                        if (chdir(args[1]) < 0) // Set process's working directory to file name specified by 2nd argument
+                        for (int i = 0; i < num_processes; i++)
                         {
-                                fprintf(stderr, "Error: cannot cd into directory\n"); // error if not successful
-                                continue;
+                                num_args += argsfunction(processes[i], process_args[i]);
                         }
-                        continue;
+                        printf("%d\n", num_args);
                 }
-                */
-
-                /*
-                // regular command
-                pid_t pid = fork(); // fork, creating child process
-                if (pid == 0)       // child
-                {
-                        if (execvp(args[0], args) < 0) // set process's working directory to file name specified by 2nd argument
-                        {
-                                fprintf(stderr, "Error: command not found\n"); // error if not successful
-                                continue;
-                        }
-                        exit(0); // try to exit with exit successful flag
-                }
-                else if (pid != 0) // parent
-                {
-                        int child_status;
-                        waitpid(pid, &child_status, 0);     // wait for child to finishing executing, then parent continue operation
-                        retval = WEXITSTATUS(child_status); // wEXITSTATUS gets exit status of child and puts it into retval
-                }
-                fprintf(stderr, "Return status value for '%s': %d\n", cmd, retval); // prints exit status of child
-                */
         }
 
         return EXIT_SUCCESS;
 }
+
+/*
+char *args[16] = {"cd", "lol"};
+// cd implementation
+if (!strcmp(args[0], "cd"))
+{
+        if (chdir(args[1]) < 0) // Set process's working directory to file name specified by 2nd argument
+        {
+                fprintf(stderr, "Error: cannot cd into directory\n"); // error if not successful
+                continue;
+        }
+        continue;
+}
+*/
+
+/*
+// regular command
+pid_t pid = fork(); // fork, creating child process
+if (pid == 0)       // child
+{
+        if (execvp(args[0], args) < 0) // set process's working directory to file name specified by 2nd argument
+        {
+                fprintf(stderr, "Error: command not found\n"); // error if not successful
+                continue;
+        }
+        exit(0); // try to exit with exit successful flag
+}
+else if (pid != 0) // parent
+{
+        int child_status;
+        waitpid(pid, &child_status, 0);     // wait for child to finishing executing, then parent continue operation
+        retval = WEXITSTATUS(child_status); // wEXITSTATUS gets exit status of child and puts it into retval
+}
+fprintf(stderr, "Return status value for '%s': %d\n", cmd, retval); // prints exit status of child
+*/
 
 /*
 if (i > 15)
