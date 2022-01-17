@@ -1,8 +1,5 @@
 /* TO DO
--implement: echo hello > file world
--fix makefile
 -report
--file name is not a argument wtf
 */
 
 #include <stdio.h>
@@ -12,21 +9,44 @@
 #include <unistd.h>
 
 #define CMDLINE_MAX 512
-#define PROCESS_MAX 16  // up to 3 pipe signs or 4 processes + 1 output redirection but can just have only multiple output redirections
-#define METACHAR_MAX 16 // up to 3 pipe signs + 1 output redirection sign but can just have multiple linked > or >&
-#define ARGS_MAX 16     // base on specifications
+#define PROCESS_MAX 5  // 5 up to 3 pipe signs or 4 processes + 1 output redirection
+#define METACHAR_MAX 4 // 4 up to 3 pipe signs + 1 output redirection sign
+#define ARGS_MAX 17    // base on specifications + 1 extra for NULL
 
 struct mystruct
 {
-        char my_process_args[ARGS_MAX];
+        char *my_process_args[ARGS_MAX];
         int my_num_items;
 };
+
+// with help from https://stackoverflow.com/questions/26522583/c-strtok-skips-second-token-or-consecutive-delimiter
+// NO IDEA FIX THIS
+char *my_strtok(char *string, char const *delimiter)
+{
+        static char *source = NULL;
+        char *p, *riturn = 0;
+
+        if (string != NULL)
+                source = string;
+        if (source == NULL)
+                return NULL;
+
+        if ((p = strpbrk(source, delimiter)) != NULL)
+        {
+                *p = 0;
+                riturn = source;
+                source = ++p;
+        }
+
+        return riturn;
+}
 
 int argsfunction(char *process, char *arg_array[ARGS_MAX])
 {
         int index_args = 0;
         char delimiter[] = " ";
         char *ptr_args;
+
         ptr_args = strtok(process, delimiter);
         while (ptr_args != NULL)
         {
@@ -34,10 +54,7 @@ int argsfunction(char *process, char *arg_array[ARGS_MAX])
                 index_args++;
                 ptr_args = strtok(NULL, delimiter);
         }
-        for (int x = 0; x < index_args; x++)
-        {
-                printf("%s\n", arg_array[x]);
-        }
+
         return index_args;
 }
 
@@ -48,16 +65,19 @@ char *removeleadspaces(char *str, int *spacesremoved)
         int num_spaces = 0;
         int str_index;
         int ret_str_index;
+
         while (str[num_spaces] == ' ') // iterate string until last leading space char
         {
                 num_spaces++;
         }
+
         for (str_index = num_spaces, ret_str_index = 0; str[str_index] != '\0'; str_index++, ret_str_index++) // copy input string(without leading spaces) to return string
         {
                 ret_str[ret_str_index] = str[str_index];
         }
         ret_str[ret_str_index] = '\0'; // add newline on last index to signify end of string
         *spacesremoved += num_spaces;
+
         return ret_str;
 }
 
@@ -111,7 +131,9 @@ int main(void)
         while (1)
         {
                 char *nl;
-                // int retval;
+                int ERROR_THROWN = 0;
+                int retval;
+                // int *retval[PROCESS_MAX - 1]; // output redirect doesnt fork()
 
                 // print prompt
                 printf("sshell$ ");
@@ -145,7 +167,6 @@ int main(void)
                         fprintf(stderr, "Bye...\n");
                         break;
                 }
-
                 // built-in command pwd
                 // with help from https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
                 else if (!strcmp(cmd, "pwd"))
@@ -153,142 +174,234 @@ int main(void)
                         char file_name_buf[_PC_PATH_MAX];
                         getcwd(file_name_buf, sizeof(file_name_buf)); // Prints out filename representing current directory.
                 }
-
-                // start of process + meta character parsing
-                // with help from https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
-                // with help from https://stackoverflow.com/questions/12460264/c-determining-which-delimiter-used-strtok
-                char *processes[PROCESS_MAX];              // array of processes + output redirection or many output redirections
-                char *process_args[PROCESS_MAX][ARGS_MAX]; // array of array of args(broken down from process)
-                char *metachar[METACHAR_MAX];              // array of strings for holding meta characters
-                char delimiter[] = ">|";                   // We want to parse the string, ignoring all spaces, >, and |
-                int num_processes = 0;                     // integer for selecting indexes in processes array
-                int num_metachar = 0;                      // integer for selecting indexes in process separators array
-                int num_output_redirec_signs = 0;
-                int num_pipesigns = 0;
-                int index_last_output_redirec = -1; // initially, not set; we dont know yet if instruction includes output redirection
-                int expect_file_arg = 0;            // boolean for checking file name after usage of > or >&; 0 false and 1 true
-                int ERROR_THROWN = 0;
-                char *ptr_process;
-                char *ptr_metachar;
-
-                // initial error checking
-                if (cmd_cpy[0] == '>' || cmd_cpy[0] == '|')
+                // built-in command pwd
+                // HAVENT DONE THIS YET
+                else if (!strcmp(cmd, "sls"))
                 {
-                        error_message(ERR_MISSING_CMD);
-                        ERROR_THROWN = 1;
+                        return 0;
                 }
+                else if (strcmp(cmd, "")) // none of the previous built-ins and input is not empty
+                {
+                        // start of process + meta character parsing
+                        // with help from https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
+                        // with help from https://stackoverflow.com/questions/12460264/c-determining-which-delimiter-used-strtok
+                        char *processes[PROCESS_MAX]; // array of processes + output redirection or many output redirections
+                        char *metachar[METACHAR_MAX]; // array of strings for holding meta characters
+                        char delimiter[] = ">|";      // We want to parse the string, ignoring all spaces, >, and |
+                        int num_processes = 0;        // integer for selecting indexes in processes array
+                        int num_metachar = 0;         // integer for selecting indexes in process separators array
+                        int num_output_redirec_signs = 0;
+                        int num_pipesigns = 0;
+                        int index_last_output_redirec = -1; // initially, not set; we dont know yet if instruction includes output redirection
+                        int expect_file_arg = 0;            // boolean for checking file name after usage of > or >&; 0 false and 1 true
+                        char *ptr_process;
+                        char *ptr_metachar;
 
-                if (NULL == strchr(cmd, '>') && NULL == strchr(cmd, '|')) // no further parsing needed because only one process
-                {
-                        processes[num_processes] = cmd_cpy;
-                        num_processes++;
-                }
-                else // more than one process; need further parsing
-                {
-                        ptr_process = strtok(cmd_cpy, delimiter); // ptr_process points to each process in the string
-                        while (ptr_process != NULL)               // keep parsing until end of user input
+                        // initial error checking
+                        if (cmd_cpy[0] == '>' || cmd_cpy[0] == '|')
                         {
-                                processes[num_processes] = ptr_process; // copy each process of cmd_copy to args array
+                                error_message(ERR_MISSING_CMD);
+                                ERROR_THROWN = 1;
+                        }
 
-                                if (processes[num_processes][0] == '&') // replace & with space if index 0 of process is &;because our delimiter is only > and |
-                                {
-                                        processes[num_processes][0] = ' ';
-                                }
-
-                                if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)] == '>') // <------ I dont understand this part at all
-                                {
-                                        if (ERROR_THROWN == 0 && (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '>' || cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '|' || cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 2] == '>' || cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 2] == '|'))
-                                        {
-                                                error_message(ERR_MISSING_FILE);
-                                                ERROR_THROWN = 1;
-                                        }
-                                        else if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '&')
-                                        {
-                                                ptr_metachar = ">&";
-                                                metachar[num_metachar] = ptr_metachar;
-                                                num_output_redirec_signs++;
-                                        }
-                                        else
-                                        {
-                                                ptr_metachar = ">";
-                                                metachar[num_metachar] = ptr_metachar;
-                                                num_output_redirec_signs++;
-                                        }
-                                        num_metachar++;
-                                        index_last_output_redirec = num_metachar;
-                                        expect_file_arg = 1;
-                                }
-                                else if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)] == '|')
-                                {
-                                        if (ERROR_THROWN == 0 && (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '>' || cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '|' || cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 2] == '>' || cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 2] == '|'))
-                                        {
-                                                error_message(ERR_MISSING_CMD);
-                                                ERROR_THROWN = 1;
-                                        }
-                                        else if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '&')
-                                        {
-                                                ptr_metachar = "|&";
-                                                metachar[num_metachar] = ptr_metachar;
-                                                num_pipesigns++;
-                                        }
-                                        else
-                                        {
-                                                ptr_metachar = "|";
-                                                metachar[num_metachar] = ptr_metachar;
-                                                num_pipesigns++;
-                                        }
-                                        num_metachar++;
-                                        expect_file_arg = 0;
-                                }
-                                else
-                                {
-                                        expect_file_arg = 0;
-                                }
-                                ptr_process = strtok(NULL, delimiter);
+                        if (NULL == strchr(cmd, '>') && NULL == strchr(cmd, '|')) // no further parsing needed because only one process
+                        {
+                                processes[num_processes] = cmd_cpy;
                                 num_processes++;
                         }
-                }
-                // end of process + meta character parsing
-
-                // DEBUG: verify correct parsing
-                for (int x = 0; x < num_processes; x++)
-                {
-                        printf("%s\n", processes[x]);
-                }
-                for (int x = 0; x < num_metachar; x++)
-                {
-                        printf("%s\n", metachar[x]);
-                }
-                printf("%d\n", num_processes);
-                printf("%d\n", num_metachar);
-
-                // more error checking
-                if (ERROR_THROWN == 0 && expect_file_arg)
-                {
-                        error_message(ERR_MISSING_FILE);
-                        ERROR_THROWN = 1;
-                }
-                if (ERROR_THROWN == 0 && index_last_output_redirec != -1 && index_last_output_redirec < num_metachar)
-                {
-                        error_message(ERR_MISLOCATE_OUT_REDIRECTION);
-                        ERROR_THROWN = 1;
-                }
-                if (ERROR_THROWN == 0 && num_metachar >= num_processes)
-                {
-                        error_message(ERR_MISSING_CMD);
-                        ERROR_THROWN = 1;
-                }
-
-                if (ERROR_THROWN == 0)
-                {
-                        // args parsing
-                        int num_args = 0;
-
-                        for (int i = 0; i < num_processes; i++)
+                        else if (!(ERROR_THROWN)) // more than one process; need further parsing
                         {
-                                num_args += argsfunction(processes[i], process_args[i]);
+                                ptr_process = strtok(cmd_cpy, delimiter); // ptr_process points to each process in the string
+                                while (ptr_process != NULL)               // keep parsing until end of user input
+                                {
+                                        processes[num_processes] = ptr_process; // copy each process of cmd_copy to args array
+
+                                        if (processes[num_processes][0] == '&') // replace & with space if index 0 of process is &;because our delimiter is only > and |
+                                        {
+                                                processes[num_processes][0] = ' ';
+                                        }
+
+                                        char delimiter_char = cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)];
+                                        char delimiter_char_plus_1 = '\0';
+                                        char delimiter_char_plus_2 = '\0';
+                                        if (num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1 < strlen(cmd))
+                                        {
+                                                char delimiter_char_plus_1 = cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1];
+                                        }
+                                        if (num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 2 < strlen(cmd))
+                                        {
+                                                char delimiter_char_plus_2 = cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 2];
+                                        }
+
+                                        if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)] == '>') // <------ I dont understand this part at all
+                                        {
+                                                if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '&')
+                                                {
+                                                        ptr_metachar = ">&";
+                                                        metachar[num_metachar] = ptr_metachar;
+                                                        num_output_redirec_signs++;
+                                                }
+                                                else
+                                                {
+                                                        ptr_metachar = ">";
+                                                        metachar[num_metachar] = ptr_metachar;
+                                                        num_output_redirec_signs++;
+                                                }
+                                                num_metachar++;
+                                                index_last_output_redirec = num_metachar;
+                                                expect_file_arg = 1;
+                                        }
+                                        else if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)] == '|')
+                                        {
+                                                if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '&')
+                                                {
+                                                        ptr_metachar = "|&";
+                                                        metachar[num_metachar] = ptr_metachar;
+                                                        num_pipesigns++;
+                                                }
+                                                else
+                                                {
+                                                        ptr_metachar = "|";
+                                                        metachar[num_metachar] = ptr_metachar;
+                                                        num_pipesigns++;
+                                                }
+                                                num_metachar++;
+                                                expect_file_arg = 0;
+                                        }
+                                        else
+                                        {
+                                                expect_file_arg = 0;
+                                        }
+
+                                        ptr_process = strtok(NULL, delimiter);
+                                        num_processes++;
+                                }
                         }
-                        printf("%d\n", num_args);
+                        // end of process + meta character parsing
+
+                        // DEBUG: verify correct parsing
+                        printf("%d\n", num_processes);
+                        printf("%d\n", num_metachar);
+                        for (int x = 0; x < num_processes; x++)
+                        {
+                                printf("%s\n", processes[x]);
+                        }
+                        for (int x = 0; x < num_metachar; x++)
+                        {
+                                printf("%s\n", metachar[x]);
+                        }
+
+                        // more error checking, then parse processes into individual arguments, then argument error checking
+                        struct mystruct process_args_and_items_count[PROCESS_MAX]; // array of array of args(broken down from process)
+                        memset(process_args_and_items_count, 0, sizeof(process_args_and_items_count));
+
+                        if (!(ERROR_THROWN) && index_last_output_redirec != -1 && index_last_output_redirec < num_metachar)
+                        {
+                                error_message(ERR_MISLOCATE_OUT_REDIRECTION);
+                                ERROR_THROWN = 1;
+                        }
+                        else if (!(ERROR_THROWN) && num_metachar >= num_processes)
+                        {
+                                error_message(ERR_MISSING_CMD);
+                                ERROR_THROWN = 1;
+                        }
+                        else if (!(ERROR_THROWN) && expect_file_arg)
+                        {
+                                error_message(ERR_MISSING_FILE);
+                                ERROR_THROWN = 1;
+                        }
+                        else if (!ERROR_THROWN)
+                        {
+                                // args parsing
+                                for (int i = 0; i < num_processes; i++)
+                                {
+                                        process_args_and_items_count[i].my_num_items = argsfunction(processes[i], process_args_and_items_count[i].my_process_args);
+                                }
+
+                                // argument checking; NOTE: file names are not arguments
+                                int num_args = 0;
+
+                                if (num_metachar == 0) // one process and no file names
+                                {
+                                        num_args += process_args_and_items_count[0].my_num_items;
+                                }
+                                else if (num_pipesigns > num_output_redirec_signs) // 3 pipe signs + 1 output redirect; only 1 file name
+                                {
+                                        for (int i = 0; i < num_processes; i++)
+                                        {
+                                                num_args += process_args_and_items_count[i].my_num_items; // file name is not considered a argument
+                                        }
+                                        num_args--; // subtract 1 file name from number of arguments
+                                }
+                                else // only output redirects or one redirect
+                                {
+                                        for (int i = 0; i < num_processes; i++)
+                                        {
+                                                num_args += process_args_and_items_count[i].my_num_items; // file name is not considered a argument
+                                        }
+                                        num_args -= num_output_redirec_signs;
+                                }
+
+                                // error if arguments > 16
+                                if (num_args > 16)
+                                {
+                                        error_message(ERR_TOO_MANY_ARGS);
+                                        ERROR_THROWN = 1;
+                                }
+
+                                // if output redirect, need additional parsing: "echo hello > file world" -> "echo hello world > file"
+                                if (num_output_redirec_signs > 0)
+                                {
+                                        int new_items_count = process_args_and_items_count[num_processes - 2].my_num_items;
+
+                                        for (int prev_index = process_args_and_items_count[num_processes - 2].my_num_items, index = 1; index < process_args_and_items_count[num_processes - 1].my_num_items; prev_index++, index++)
+                                        {
+                                                process_args_and_items_count[num_processes - 2].my_process_args[prev_index] = process_args_and_items_count[num_processes - 1].my_process_args[index];
+                                                new_items_count++;
+                                        }
+
+                                        process_args_and_items_count[num_processes - 2].my_num_items = new_items_count;
+                                }
+                        }
+
+                        if (!ERROR_THROWN) // input has no errors; we execute the commands
+                        {
+                                if (num_metachar == 0)
+                                {
+                                        if (!strcmp(process_args_and_items_count[0].my_process_args[0], "cd"))
+                                        {
+                                                if (chdir(process_args_and_items_count[0].my_process_args[1]) < 0) // Set process's working directory to file name specified by 2nd argument
+                                                {
+                                                        retval = 1;
+                                                        fprintf(stderr, "Error: cannot cd into directory\n"); // error if not successful
+                                                }
+                                        }
+
+                                        else
+                                        {
+                                                pid_t pid = fork(); // fork, creating child process
+                                                if (pid == 0)       // child
+                                                {
+                                                        if (execvp(process_args_and_items_count[0].my_process_args[0], process_args_and_items_count[0].my_process_args) < 0)
+                                                        {
+                                                                fprintf(stderr, "Error: command not found\n"); // error if not successful
+                                                        }
+                                                        exit(0); // try to exit with exit successful flag
+                                                }
+                                                else if (pid != 0) // parent
+                                                {
+                                                        int child_status;
+                                                        waitpid(pid, &child_status, 0);     // wait for child to finishing executing, then parent continue operation
+                                                        retval = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
+                                                }
+                                        }
+                                }
+                        }
+                }
+
+                if (strcmp(cmd, ""))
+                {
+                        fprintf(stderr, "Return status value for '%s': %d\n", cmd, retval); // prints exit status of child
                 }
         }
 
@@ -296,44 +409,19 @@ int main(void)
 }
 
 /*
-char *args[16] = {"cd", "lol"};
-// cd implementation
-if (!strcmp(args[0], "cd"))
-{
-        if (chdir(args[1]) < 0) // Set process's working directory to file name specified by 2nd argument
-        {
-                fprintf(stderr, "Error: cannot cd into directory\n"); // error if not successful
-                continue;
-        }
-        continue;
-}
-*/
-
-/*
-// regular command
-pid_t pid = fork(); // fork, creating child process
-if (pid == 0)       // child
-{
-        if (execvp(args[0], args) < 0) // set process's working directory to file name specified by 2nd argument
-        {
-                fprintf(stderr, "Error: command not found\n"); // error if not successful
-                continue;
-        }
-        exit(0); // try to exit with exit successful flag
-}
-else if (pid != 0) // parent
-{
-        int child_status;
-        waitpid(pid, &child_status, 0);     // wait for child to finishing executing, then parent continue operation
-        retval = WEXITSTATUS(child_status); // wEXITSTATUS gets exit status of child and puts it into retval
-}
-fprintf(stderr, "Return status value for '%s': %d\n", cmd, retval); // prints exit status of child
-*/
-
-/*
 if (i > 15)
 {
         fprintf(stderr, "Error: too many process arguments\n"); // error if too many arguments passed in through terminal
         break;
 }
+*/
+
+/*
+                        for (int i = 0; i < PROCESS_MAX; i++)                      // reset mystruct
+                        {
+                                for (int j = 0; j < ARGS_MAX; j++)
+                                {
+                                        process_args_and_items_count[i].my_process_args[j] = NULL;
+                                }
+                        }
 */
