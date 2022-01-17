@@ -12,34 +12,13 @@
 #define PROCESS_MAX 5  // 5 up to 3 pipe signs or 4 processes + 1 output redirection
 #define METACHAR_MAX 4 // 4 up to 3 pipe signs + 1 output redirection sign
 #define ARGS_MAX 17    // base on specifications + 1 extra for NULL
+#define TOKEN_MAX 32
 
 struct mystruct
 {
         char *my_process_args[ARGS_MAX];
         int my_num_items;
 };
-
-// with help from https://stackoverflow.com/questions/26522583/c-strtok-skips-second-token-or-consecutive-delimiter
-// NO IDEA FIX THIS
-char *my_strtok(char *string, char const *delimiter)
-{
-        static char *source = NULL;
-        char *p, *riturn = 0;
-
-        if (string != NULL)
-                source = string;
-        if (source == NULL)
-                return NULL;
-
-        if ((p = strpbrk(source, delimiter)) != NULL)
-        {
-                *p = 0;
-                riturn = source;
-                source = ++p;
-        }
-
-        return riturn;
-}
 
 int argsfunction(char *process, char *arg_array[ARGS_MAX])
 {
@@ -133,7 +112,7 @@ int main(void)
                 char *nl;
                 int ERROR_THROWN = 0;
                 int retval;
-                // int *retval[PROCESS_MAX - 1]; // output redirect doesnt fork()
+                //// int *retval[PROCESS_MAX - 1]; // output redirect doesnt fork()
 
                 // print prompt
                 printf("sshell$ ");
@@ -162,25 +141,26 @@ int main(void)
                 cmd_cpy = removeleadspaces(cmd, &num_spaces);
 
                 // builtin command exit
-                if (!strcmp(cmd, "exit"))
+                if (!strcmp(cmd_cpy, "exit"))
                 {
                         fprintf(stderr, "Bye...\n");
-                        break;
+                        fprintf(stderr, "+ completed 'exit' [0]\n");
+                        exit(0);
                 }
                 // built-in command pwd
                 // with help from https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
-                else if (!strcmp(cmd, "pwd"))
+                if (!strcmp(cmd_cpy, "pwd"))
                 {
-                        char file_name_buf[_PC_PATH_MAX];
-                        getcwd(file_name_buf, sizeof(file_name_buf)); // Prints out filename representing current directory.
+                        char file_name_buff[_PC_PATH_MAX];
+                        getcwd(file_name_buff, sizeof(file_name_buff)); // Prints out filename representing current directory.
                 }
                 // built-in command pwd
                 // HAVENT DONE THIS YET
-                else if (!strcmp(cmd, "sls"))
+                if (!strcmp(cmd_cpy, "sls"))
                 {
                         return 0;
                 }
-                else if (strcmp(cmd, "")) // none of the previous built-ins and input is not empty
+                if (strcmp(cmd, "")) // none of the previous built-ins and input is not empty
                 {
                         // start of process + meta character parsing
                         // with help from https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
@@ -198,13 +178,13 @@ int main(void)
                         char *ptr_metachar;
 
                         // initial error checking
-                        if (cmd_cpy[0] == '>' || cmd_cpy[0] == '|')
+                        if ((NULL != strstr(cmd, "|>") && NULL != strstr(cmd, "||") && NULL != strstr(cmd, "|&>") && NULL != strstr(cmd, "|&|")) || cmd_cpy[0] == '|' || cmd_cpy[0] == '>')
                         {
                                 error_message(ERR_MISSING_CMD);
                                 ERROR_THROWN = 1;
                         }
 
-                        if (NULL == strchr(cmd, '>') && NULL == strchr(cmd, '|')) // no further parsing needed because only one process
+                        if (!(ERROR_THROWN) && NULL == strchr(cmd, '>') && NULL == strchr(cmd, '|')) // no further parsing needed because only one process
                         {
                                 processes[num_processes] = cmd_cpy;
                                 num_processes++;
@@ -216,21 +196,9 @@ int main(void)
                                 {
                                         processes[num_processes] = ptr_process; // copy each process of cmd_copy to args array
 
-                                        if (processes[num_processes][0] == '&') // replace & with space if index 0 of process is &;because our delimiter is only > and |
+                                        if (processes[num_processes][0] == '&' && strlen(processes[num_processes]) != 1) // replace & with space if index 0 of process is &;because our delimiter is only > and |
                                         {
                                                 processes[num_processes][0] = ' ';
-                                        }
-
-                                        char delimiter_char = cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)];
-                                        char delimiter_char_plus_1 = '\0';
-                                        char delimiter_char_plus_2 = '\0';
-                                        if (num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1 < strlen(cmd))
-                                        {
-                                                char delimiter_char_plus_1 = cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1];
-                                        }
-                                        if (num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 2 < strlen(cmd))
-                                        {
-                                                char delimiter_char_plus_2 = cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 2];
                                         }
 
                                         if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)] == '>') // <------ I dont understand this part at all
@@ -300,14 +268,14 @@ int main(void)
                                 error_message(ERR_MISLOCATE_OUT_REDIRECTION);
                                 ERROR_THROWN = 1;
                         }
-                        else if (!(ERROR_THROWN) && num_metachar >= num_processes)
-                        {
-                                error_message(ERR_MISSING_CMD);
-                                ERROR_THROWN = 1;
-                        }
                         else if (!(ERROR_THROWN) && expect_file_arg)
                         {
                                 error_message(ERR_MISSING_FILE);
+                                ERROR_THROWN = 1;
+                        }
+                        else if (!(ERROR_THROWN) && num_metachar >= num_processes)
+                        {
+                                error_message(ERR_MISSING_CMD);
                                 ERROR_THROWN = 1;
                         }
                         else if (!ERROR_THROWN)
@@ -399,9 +367,9 @@ int main(void)
                         }
                 }
 
-                if (strcmp(cmd, ""))
+                if (!(ERROR_THROWN) && strcmp(cmd, ""))
                 {
-                        fprintf(stderr, "Return status value for '%s': %d\n", cmd, retval); // prints exit status of child
+                        fprintf(stderr, "+ completed '%s': %d\n", cmd, retval); // prints exit status of child
                 }
         }
 
