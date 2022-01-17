@@ -1,4 +1,5 @@
 /* TO DO
+-recomment due to change of parsing
 -report
 */
 
@@ -9,15 +10,40 @@
 #include <unistd.h>
 
 #define CMDLINE_MAX 512
-#define PROCESS_MAX 5  // up to 3 pipe signs or 4 processes + 1 output redirection
-#define METACHAR_MAX 4 // up to 3 pipe signs + 1 output redirection sign
-#define ARGS_MAX 17    // base on specifications + 1 extra for NULL
+#define PROCESS_MAX 5                           // up to 3 pipe signs or 4 processes + 1 output redirection
+#define METACHAR_MAX 4                          // up to 3 pipe signs + 1 output redirection sign
+#define ARGS_MAX 17                             // base on specifications + 1 extra for NULL
+#define CONTENTS_MAX PROCESS_MAX + METACHAR_MAX // 5 process + 4 meta char
 
 struct mystruct
 {
         char *my_process_args[ARGS_MAX];
         int my_num_items;
 };
+
+// with help from https://stackoverflow.com/questions/26522583/c-strtok-skips-second-token-or-consecutive-delimiter
+// what strtok should have been; able to detect consecutive delimiters
+char *my_strtok(char *string, char const *delimiter)
+{
+        static char *ptr_source = NULL;
+        char *ptr_delimiter;
+        char *ptr_ret = 0;
+
+        if (string != NULL) // if not done, continue finding delimiters
+                ptr_source = string;
+        if (ptr_source == NULL)
+                return NULL; // done... found all delimiters
+
+        if ((ptr_delimiter = strpbrk(ptr_source, delimiter)) != NULL) // locate delimiters
+        {
+                *ptr_delimiter = 0;
+                ptr_ret = ptr_source;
+                ptr_delimiter++;
+                ptr_source = ptr_delimiter;
+        }
+
+        return ptr_ret;
+}
 
 int argsfunction(char *process, char *arg_array[ARGS_MAX])
 {
@@ -53,7 +79,8 @@ char *removeleadspaces(char *str, int *spacesremoved)
         {
                 ret_str[ret_str_index] = str[str_index];
         }
-        ret_str[ret_str_index] = '\0'; // add newline on last index to signify end of string
+        ret_str[ret_str_index] = '>';      // add extra > for easier parsing
+        ret_str[ret_str_index + 1] = '\0'; // add newline on last index to signify end of string
         *spacesremoved += num_spaces;
 
         return ret_str;
@@ -139,155 +166,147 @@ int main(void)
                 int num_spaces = 0;
                 cmd_cpy = removeleadspaces(cmd, &num_spaces);
 
-                // builtin command exit
-                if (!strcmp(cmd_cpy, "exit"))
-                {
-                        fprintf(stderr, "Bye...\n");
-                        fprintf(stderr, "+ completed 'exit' [0]\n");
-                        exit(0);
-                }
                 // built-in command pwd
                 // with help from https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
-                if (!strcmp(cmd_cpy, "pwd"))
+                if (!strcmp(cmd, "pwd"))
                 {
                         char file_name_buff[_PC_PATH_MAX];
                         getcwd(file_name_buff, sizeof(file_name_buff)); // Prints out filename representing current directory.
                 }
                 // built-in command pwd
                 // HAVENT DONE THIS YET
-                if (!strcmp(cmd_cpy, "sls"))
+                if (!strcmp(cmd, "sls"))
                 {
                         return 0;
                 }
-                if (strcmp(cmd, "")) // none of the previous built-ins and input is not empty
+                // builtin command exit
+                if (!strcmp(cmd, "exit"))
                 {
-                        // start of process + meta character parsing
+                        fprintf(stderr, "Bye...\n");
+                        fprintf(stderr, "+ completed 'exit' [0]\n");
+                        exit(0);
+                }
+                else if (strcmp(cmd, "")) // none of the previous built-ins and input is not empty
+                {
+                        // start of contents parsing(for error checking) and meta char parsing
                         // with help from https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
                         // with help from https://stackoverflow.com/questions/12460264/c-determining-which-delimiter-used-strtok
-                        char *processes[PROCESS_MAX]; // array of processes + output redirection or many output redirections
-                        char *metachar[METACHAR_MAX]; // array of strings for holding meta characters
-                        char delimiter[] = "|>";      // We want to parse the string, ignoring all spaces, >, and |
-                        int num_processes = 0;        // integer for selecting indexes in processes array
-                        int num_metachar = 0;         // integer for selecting indexes in process separators array
+                        char *contents[CONTENTS_MAX]; // array of strings; hold strings of processes + meta characters
+                        char *metachar[METACHAR_MAX]; // array of strings; hold only the meta characters
+                        int num_contents = 0;
+                        int num_metachar = 0;
+                        int num_pipe_signs = 0;
                         int num_output_redirec_signs = 0;
-                        int num_pipesigns = 0;
-                        int index_output_redirect = -1; // initially, not set; we dont know yet if instruction includes output redirection
-                        int expect_file_arg = 0;        // boolean for checking file name after usage of > or >&; 0 false and 1 true
+                        int index_output_redirect = -1; // initially, not set
+                        char delimiter[] = "|>";        // we want to parse the string, ignoring all spaces, >, and |
+                        int skip_and_sign = 0;
                         char *ptr_process;
                         char *ptr_metachar;
 
-                        // initial error checking
-                        if (NULL != strstr(cmd, "|>") || NULL != strstr(cmd, "|&>") || cmd_cpy[0] == '|' || cmd_cpy[0] == '>')
+                        ptr_process = my_strtok(cmd_cpy, delimiter); // ptr_process points to each process in the string
+                        while (ptr_process)                          // keep parsing until end of string
                         {
-                                error_message(ERR_MISSING_CMD);
-                                ERROR_THROWN = 1;
-                        }
-
-                        if (!(ERROR_THROWN) && NULL == strchr(cmd, '>') && NULL == strchr(cmd, '|')) // no further parsing needed because only one process
-                        {
-                                processes[num_processes] = cmd_cpy;
-                                num_processes++;
-                        }
-                        else if (!(ERROR_THROWN)) // more than one process; need further parsing
-                        {
-                                ptr_process = strtok(cmd_cpy, delimiter); // ptr_process points to each process in the string
-                                while (ptr_process != NULL)               // keep parsing until end of user input
+                                if (skip_and_sign) // copy each process of cmd_copy to args array
                                 {
-                                        processes[num_processes] = ptr_process; // copy each process of cmd_copy to args array
+                                        contents[num_contents] = ++ptr_process;
+                                        skip_and_sign = 0;
+                                }
+                                else
+                                {
+                                        contents[num_contents] = ptr_process;
+                                }
 
-                                        if (processes[num_processes][0] == '&' && strlen(processes[num_processes]) != 1) // replace & with space if index 0 of process is &;because our delimiter is only > and |
+                                if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)] == '>') // append meta chars to cotents
+                                {
+                                        if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '&')
                                         {
-                                                processes[num_processes][0] = ' ';
-                                        }
-
-                                        if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)] == '>') // <------ I dont understand this part at all
-                                        {
-                                                if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '&')
-                                                {
-                                                        ptr_metachar = ">&";
-                                                        metachar[num_metachar] = ptr_metachar;
-                                                        num_output_redirec_signs++;
-                                                }
-                                                else
-                                                {
-                                                        ptr_metachar = ">";
-                                                        metachar[num_metachar] = ptr_metachar;
-                                                        num_output_redirec_signs++;
-                                                }
-                                                num_metachar++;
-                                                index_output_redirect = num_metachar;
-                                                expect_file_arg = 1;
-                                        }
-                                        else if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)] == '|')
-                                        {
-                                                if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '&')
-                                                {
-                                                        ptr_metachar = "|&";
-                                                        metachar[num_metachar] = ptr_metachar;
-                                                        num_pipesigns++;
-                                                }
-                                                else
-                                                {
-                                                        ptr_metachar = "|";
-                                                        metachar[num_metachar] = ptr_metachar;
-                                                        num_pipesigns++;
-                                                }
-                                                num_metachar++;
-                                                expect_file_arg = 0;
+                                                ptr_metachar = ">&";
+                                                skip_and_sign = 1;
                                         }
                                         else
                                         {
-                                                expect_file_arg = 0;
+                                                ptr_metachar = ">";
                                         }
+                                        num_contents++;
+                                        index_output_redirect = num_contents;
+                                        contents[num_contents] = ptr_metachar;
+                                        metachar[num_metachar] = ptr_metachar;
+                                        num_metachar++;
+                                        num_output_redirec_signs++;
+                                }
+                                else if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)] == '|') // append meta chars to cotents
+                                {
+                                        if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process) + 1] == '&')
+                                        {
+                                                ptr_metachar = "|&";
+                                                skip_and_sign = 1;
+                                        }
+                                        else
+                                        {
+                                                ptr_metachar = "|";
+                                        }
+                                        num_contents++;
+                                        contents[num_contents] = ptr_metachar;
+                                        metachar[num_metachar] = ptr_metachar;
+                                        num_metachar++;
+                                        num_pipe_signs++;
+                                }
 
-                                        ptr_process = strtok(NULL, delimiter);
-                                        num_processes++;
+                                ptr_process = my_strtok(NULL, delimiter);
+                                num_contents++;
+                        }
+                        // end of contents parsing(for error checking) and meta char parsing
+
+                        // error checking
+                        for (int i = 0; i < num_contents; i++) // check for blank processes
+                        {
+                                if (!strcmp(contents[i], ""))
+                                {
+                                        error_message(ERR_MISSING_CMD);
+                                        ERROR_THROWN = 1;
+                                        break;
+                                }
+                                else if (contents[i][0] == '>')
+                                {
+                                        break;
                                 }
                         }
-                        // end of process + meta character parsing
-
-                        // DEBUG: verify correct parsing
-                        printf("%d\n", num_processes);
-                        printf("%d\n", num_metachar);
-                        for (int x = 0; x < num_processes; x++)
+                        if (!(ERROR_THROWN) && index_output_redirect > 0) // check for missing file names
                         {
-                                printf("%s\n", processes[x]);
+                                if (strcmp(contents[index_output_redirect - 1], "") && !strcmp(contents[index_output_redirect + 1], ""))
+                                {
+                                        error_message(ERR_MISSING_FILE);
+                                        ERROR_THROWN = 1;
+                                }
                         }
-                        for (int x = 0; x < num_metachar; x++)
+                        if (!(ERROR_THROWN)) // check for mislocated output redirection sign
                         {
-                                printf("%s\n", metachar[x]);
+                                for (int i = 0; i < num_contents; i++)
+                                {
+                                        if (contents[i][0] == '|' && i > index_output_redirect)
+                                        {
+                                                error_message(ERR_MISLOCATE_OUT_REDIRECTION);
+                                                ERROR_THROWN = 1;
+                                                break;
+                                        }
+                                }
                         }
 
-                        // more error checking, then parse processes into individual arguments if no errors
+                        // start of process to args parsing
                         struct mystruct process_args_and_items_count[PROCESS_MAX];                     // array of array of args(broken down from process)
                         memset(process_args_and_items_count, 0, sizeof(process_args_and_items_count)); // reset mystruct
+                        int num_processes = 0;
 
-                        if ((!ERROR_THROWN) && (NULL != strstr(cmd, "||") || NULL != strstr(cmd, "|&|")))
+                        if (!ERROR_THROWN)
                         {
-                                error_message(ERR_MISSING_CMD);
-                                ERROR_THROWN = 1;
-                        }
-                        else if (!(ERROR_THROWN) && expect_file_arg)
-                        {
-                                error_message(ERR_MISSING_FILE);
-                                ERROR_THROWN = 1;
-                        }
-                        else if (!(ERROR_THROWN) && num_metachar >= num_processes)
-                        {
-                                error_message(ERR_MISSING_CMD);
-                                ERROR_THROWN = 1;
-                        }
-                        else if (!(ERROR_THROWN) && index_output_redirect != -1 && index_output_redirect < num_metachar)
-                        {
-                                error_message(ERR_MISLOCATE_OUT_REDIRECTION);
-                                ERROR_THROWN = 1;
-                        }
-                        else if (!ERROR_THROWN)
-                        {
-                                // args parsing
-                                for (int i = 0; i < num_processes; i++)
+                                // process -> args parsing
+                                for (int i = 0; i < num_contents; i++)
                                 {
-                                        process_args_and_items_count[i].my_num_items = argsfunction(processes[i], process_args_and_items_count[i].my_process_args);
+                                        if (contents[i][0] != '>' && contents[num_contents][0] != '|')
+                                        {
+                                                process_args_and_items_count[num_processes].my_num_items = argsfunction(contents[i], process_args_and_items_count[num_processes].my_process_args);
+                                                num_processes++;
+                                        }
                                 }
 
                                 // argument checking; NOTE: file names are not arguments
@@ -297,7 +316,7 @@ int main(void)
                                 {
                                         num_args += process_args_and_items_count[0].my_num_items;
                                 }
-                                else if (num_pipesigns > num_output_redirec_signs) // 3 pipe signs + 1 output redirect; only 1 file name
+                                else if (num_pipe_signs > num_output_redirec_signs) // 3 pipe signs + 1 output redirect; only 1 file name
                                 {
                                         for (int i = 0; i < num_processes; i++)
                                         {
@@ -334,6 +353,26 @@ int main(void)
 
                                         process_args_and_items_count[num_processes - 2].my_num_items = new_items_count;
                                 }
+                        }
+
+                        /* debugging
+                        for (int i = 0; i < num_processes; i++)
+                        {
+                                int k = process_args_and_items_count[i].my_num_items;
+                                for (int j = 0; j < k; j++)
+                                {
+                                        printf("args: %s\n", process_args_and_items_count[i].my_process_args[j]);
+                                }
+                        }
+                        for (int i = 0; i < num_metachar; i++)
+                        {
+                                printf("meta: %s\n", metachar[i]);
+                        }
+                        */
+
+                        if (metachar[0] == 0)
+                        {
+                                continue;
                         }
 
                         if (!ERROR_THROWN) // input has no errors; we execute the commands
