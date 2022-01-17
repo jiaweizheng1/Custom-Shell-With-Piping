@@ -9,10 +9,9 @@
 #include <unistd.h>
 
 #define CMDLINE_MAX 512
-#define PROCESS_MAX 5  // 5 up to 3 pipe signs or 4 processes + 1 output redirection
-#define METACHAR_MAX 4 // 4 up to 3 pipe signs + 1 output redirection sign
+#define PROCESS_MAX 5  // up to 3 pipe signs or 4 processes + 1 output redirection
+#define METACHAR_MAX 4 // up to 3 pipe signs + 1 output redirection sign
 #define ARGS_MAX 17    // base on specifications + 1 extra for NULL
-#define TOKEN_MAX 32
 
 struct mystruct
 {
@@ -167,18 +166,18 @@ int main(void)
                         // with help from https://stackoverflow.com/questions/12460264/c-determining-which-delimiter-used-strtok
                         char *processes[PROCESS_MAX]; // array of processes + output redirection or many output redirections
                         char *metachar[METACHAR_MAX]; // array of strings for holding meta characters
-                        char delimiter[] = ">|";      // We want to parse the string, ignoring all spaces, >, and |
+                        char delimiter[] = "|>";      // We want to parse the string, ignoring all spaces, >, and |
                         int num_processes = 0;        // integer for selecting indexes in processes array
                         int num_metachar = 0;         // integer for selecting indexes in process separators array
                         int num_output_redirec_signs = 0;
                         int num_pipesigns = 0;
-                        int index_last_output_redirec = -1; // initially, not set; we dont know yet if instruction includes output redirection
-                        int expect_file_arg = 0;            // boolean for checking file name after usage of > or >&; 0 false and 1 true
+                        int index_output_redirect = -1; // initially, not set; we dont know yet if instruction includes output redirection
+                        int expect_file_arg = 0;        // boolean for checking file name after usage of > or >&; 0 false and 1 true
                         char *ptr_process;
                         char *ptr_metachar;
 
                         // initial error checking
-                        if ((NULL != strstr(cmd, "|>") && NULL != strstr(cmd, "||") && NULL != strstr(cmd, "|&>") && NULL != strstr(cmd, "|&|")) || cmd_cpy[0] == '|' || cmd_cpy[0] == '>')
+                        if (NULL != strstr(cmd, "|>") || NULL != strstr(cmd, "|&>") || cmd_cpy[0] == '|' || cmd_cpy[0] == '>')
                         {
                                 error_message(ERR_MISSING_CMD);
                                 ERROR_THROWN = 1;
@@ -216,7 +215,7 @@ int main(void)
                                                         num_output_redirec_signs++;
                                                 }
                                                 num_metachar++;
-                                                index_last_output_redirec = num_metachar;
+                                                index_output_redirect = num_metachar;
                                                 expect_file_arg = 1;
                                         }
                                         else if (cmd[num_spaces + ptr_process - cmd_cpy + strlen(ptr_process)] == '|')
@@ -259,13 +258,13 @@ int main(void)
                                 printf("%s\n", metachar[x]);
                         }
 
-                        // more error checking, then parse processes into individual arguments, then argument error checking
-                        struct mystruct process_args_and_items_count[PROCESS_MAX]; // array of array of args(broken down from process)
-                        memset(process_args_and_items_count, 0, sizeof(process_args_and_items_count));
+                        // more error checking, then parse processes into individual arguments if no errors
+                        struct mystruct process_args_and_items_count[PROCESS_MAX];                     // array of array of args(broken down from process)
+                        memset(process_args_and_items_count, 0, sizeof(process_args_and_items_count)); // reset mystruct
 
-                        if (!(ERROR_THROWN) && index_last_output_redirec != -1 && index_last_output_redirec < num_metachar)
+                        if ((!ERROR_THROWN) && (NULL != strstr(cmd, "||") || NULL != strstr(cmd, "|&|")))
                         {
-                                error_message(ERR_MISLOCATE_OUT_REDIRECTION);
+                                error_message(ERR_MISSING_CMD);
                                 ERROR_THROWN = 1;
                         }
                         else if (!(ERROR_THROWN) && expect_file_arg)
@@ -276,6 +275,11 @@ int main(void)
                         else if (!(ERROR_THROWN) && num_metachar >= num_processes)
                         {
                                 error_message(ERR_MISSING_CMD);
+                                ERROR_THROWN = 1;
+                        }
+                        else if (!(ERROR_THROWN) && index_output_redirect != -1 && index_output_redirect < num_metachar)
+                        {
+                                error_message(ERR_MISLOCATE_OUT_REDIRECTION);
                                 ERROR_THROWN = 1;
                         }
                         else if (!ERROR_THROWN)
@@ -338,10 +342,10 @@ int main(void)
                                 {
                                         if (!strcmp(process_args_and_items_count[0].my_process_args[0], "cd"))
                                         {
-                                                if (chdir(process_args_and_items_count[0].my_process_args[1]) < 0) // Set process's working directory to file name specified by 2nd argument
+                                                if (chdir(process_args_and_items_count[0].my_process_args[1]) < 0) // set process's working directory to file name specified by 2nd argument
                                                 {
                                                         retval = 1;
-                                                        fprintf(stderr, "Error: cannot cd into directory\n"); // error if not successful
+                                                        error_message(ERR_CANT_CD_DIR); // error if not successful
                                                 }
                                         }
 
@@ -352,7 +356,7 @@ int main(void)
                                                 {
                                                         if (execvp(process_args_and_items_count[0].my_process_args[0], process_args_and_items_count[0].my_process_args) < 0)
                                                         {
-                                                                fprintf(stderr, "Error: command not found\n"); // error if not successful
+                                                                error_message(ERR_CMD_NOTFOUND); // error if not successful
                                                         }
                                                         exit(0); // try to exit with exit successful flag
                                                 }
@@ -375,21 +379,3 @@ int main(void)
 
         return EXIT_SUCCESS;
 }
-
-/*
-if (i > 15)
-{
-        fprintf(stderr, "Error: too many process arguments\n"); // error if too many arguments passed in through terminal
-        break;
-}
-*/
-
-/*
-                        for (int i = 0; i < PROCESS_MAX; i++)                      // reset mystruct
-                        {
-                                for (int j = 0; j < ARGS_MAX; j++)
-                                {
-                                        process_args_and_items_count[i].my_process_args[j] = NULL;
-                                }
-                        }
-*/
