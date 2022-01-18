@@ -4,12 +4,14 @@
 */
 
 #include <ctype.h> // isspace function
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/wait.h> // to access waitpid function
-#include <unistd.h>   // open function
+#include <unistd.h>   // open file function
 
 #define CMDLINE_MAX 512
 #define PROCESS_MAX 5                           // up to 3 pipe signs or 4 processes + 1 output redirection
@@ -23,6 +25,8 @@ struct mystruct
         char *my_process_args[ARGS_MAX];
         int my_num_items;
 };
+
+struct stat stat_buff;
 
 int is_spaces(char const *chr)
 {
@@ -182,27 +186,7 @@ int main(void)
                 int num_spaces = 0;
                 cmd_cpy = removeleadspaces(cmd, &num_spaces);
 
-                // builtin command exit
-                if (!strcmp(cmd, "exit"))
-                {
-                        fprintf(stderr, "Bye...\n");
-                        fprintf(stderr, "+ completed 'exit' [0]\n");
-                        exit(0);
-                }
-                // built-in command pwd
-                // with help from https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
-                if (!strcmp(cmd, "pwd"))
-                {
-                        char file_name_buff[_PC_PATH_MAX];
-                        getcwd(file_name_buff, sizeof(file_name_buff)); // Prints out filename representing current directory.
-                }
-                // built-in command sls
-                // HAVENT DONE THIS YET
-                if (!strcmp(cmd, "sls"))
-                {
-                        return 0;
-                }
-                else if (strcmp(cmd, "")) // none of the previous built-ins and input is not empty
+                if (!is_spaces(cmd)) // none of the previous built-ins and input is not empty
                 {
                         // start of contents parsing(for error checking) and meta char parsing
                         // with help from https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
@@ -393,15 +377,63 @@ int main(void)
                         }
                         */
 
-                        if (metachar[0] == 0)
-                        {
-                                continue;
-                        }
-
                         if (!ERROR_THROWN) // input has no errors; we execute the commands
                         {
-                                if (num_metachar == 0) // no > or &
+                                // built-in command pwd
+                                // with help from https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
+                                if (!strcmp(process_args_and_items_count[0].my_process_args[0], "pwd"))
                                 {
+                                        char file_name[_PC_PATH_MAX];
+                                        if (NULL != getcwd(file_name, sizeof(file_name))) // Prints out filename representing current directory.
+                                        {
+                                                retval[num_retval] = 0;
+                                                num_retval++;
+                                        }
+                                        else // unsuccessful
+                                        {
+                                                retval[num_retval] = 1;
+                                                num_retval++;
+                                        }
+                                }
+                                // builtin command exit
+                                if (!strcmp(process_args_and_items_count[0].my_process_args[0], "exit"))
+                                {
+                                        fprintf(stderr, "Bye...\n");
+                                        fprintf(stderr, "+ completed 'exit' [0]\n");
+                                        exit(0);
+                                }
+                                // built-in command sls
+                                if (!strcmp(process_args_and_items_count[0].my_process_args[0], "sls"))
+                                {
+                                        DIR *ptr_dir;
+                                        struct dirent *ptr_dir_entry;
+
+                                        ptr_dir = opendir("."); // "." refer to current working directory
+                                        if (ptr_dir != NULL)
+                                        {
+                                                while ((ptr_dir_entry = readdir(ptr_dir)))
+                                                {
+                                                        if (ptr_dir_entry->d_name[0] != '.')
+                                                        {
+                                                                stat(ptr_dir_entry->d_name, &stat_buff);
+                                                                fprintf(stdout, "%s (%ld bytes)\n", ptr_dir_entry->d_name, stat_buff.st_size);
+                                                        }
+                                                }
+                                                (void)closedir(ptr_dir); // done with directory
+
+                                                retval[num_retval] = 0;
+                                                num_retval++;
+                                        }
+                                        else
+                                        {
+                                                error_message(ERR_CANT_SLS_DIR);
+                                                retval[num_retval] = 1;
+                                                num_retval++;
+                                        }
+                                }
+                                else if (num_metachar == 0) // no > or & in command
+                                {
+                                        // built-in command cd
                                         if (!strcmp(process_args_and_items_count[0].my_process_args[0], "cd"))
                                         {
                                                 if (chdir(process_args_and_items_count[0].my_process_args[1]) < 0) // set process's working directory to file name specified by 2nd argument
@@ -436,7 +468,7 @@ int main(void)
                                                 }
                                         }
                                 }
-                                else if (num_metachar == num_output_redirec_signs) // >*
+                                else if (num_metachar == num_output_redirec_signs) // command with >*
                                 {
                                         pid_t pid = fork(); // fork, creating child process
                                         if (pid == 0)       // child
@@ -471,7 +503,7 @@ int main(void)
                         }
                 }
 
-                if (!(ERROR_THROWN) && strcmp(cmd, ""))
+                if (!(ERROR_THROWN) && !is_spaces(cmd))
                 {
                         fprintf(stderr, "+ completed '%s'", cmd); // prints exit status of child
 
