@@ -3,23 +3,39 @@
 -report
 */
 
+#include <ctype.h> // isspace function
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h> // to access waitpid function
-#include <unistd.h>
+#include <unistd.h>   // open function
 
 #define CMDLINE_MAX 512
 #define PROCESS_MAX 5                           // up to 3 pipe signs or 4 processes + 1 output redirection
 #define METACHAR_MAX 4                          // up to 3 pipe signs + 1 output redirection sign
-#define ARGS_MAX 17                             // base on specifications + 1 extra for NULL
 #define CONTENTS_MAX PROCESS_MAX + METACHAR_MAX // 5 process + 4 meta char
+#define ARGS_MAX 17                             // base on specifications + 1 extra for NULL
+#define RETVAL_MAX 4                            // 3 pipe signs so max of 4 return values
 
 struct mystruct
 {
         char *my_process_args[ARGS_MAX];
         int my_num_items;
 };
+
+int is_spaces(char const *chr)
+{
+        while (*chr != '\0')
+        {
+                if (!isspace((unsigned char)*chr))
+                {
+                        return 0;
+                }
+                chr++;
+        }
+        return 1;
+}
 
 // with help from https://stackoverflow.com/questions/26522583/c-strtok-skips-second-token-or-consecutive-delimiter
 // what strtok should have been; able to detect consecutive delimiters
@@ -137,8 +153,8 @@ int main(void)
         {
                 char *nl;
                 int ERROR_THROWN = 0;
-                int retval;
-                //// int *retval[PROCESS_MAX - 1]; // output redirect doesnt fork()
+                int retval[RETVAL_MAX];
+                int num_retval = 0;
 
                 // print prompt
                 printf("sshell$ ");
@@ -166,6 +182,13 @@ int main(void)
                 int num_spaces = 0;
                 cmd_cpy = removeleadspaces(cmd, &num_spaces);
 
+                // builtin command exit
+                if (!strcmp(cmd, "exit"))
+                {
+                        fprintf(stderr, "Bye...\n");
+                        fprintf(stderr, "+ completed 'exit' [0]\n");
+                        exit(0);
+                }
                 // built-in command pwd
                 // with help from https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
                 if (!strcmp(cmd, "pwd"))
@@ -173,18 +196,11 @@ int main(void)
                         char file_name_buff[_PC_PATH_MAX];
                         getcwd(file_name_buff, sizeof(file_name_buff)); // Prints out filename representing current directory.
                 }
-                // built-in command pwd
+                // built-in command sls
                 // HAVENT DONE THIS YET
                 if (!strcmp(cmd, "sls"))
                 {
                         return 0;
-                }
-                // builtin command exit
-                if (!strcmp(cmd, "exit"))
-                {
-                        fprintf(stderr, "Bye...\n");
-                        fprintf(stderr, "+ completed 'exit' [0]\n");
-                        exit(0);
                 }
                 else if (strcmp(cmd, "")) // none of the previous built-ins and input is not empty
                 {
@@ -257,10 +273,17 @@ int main(void)
                         }
                         // end of contents parsing(for error checking) and meta char parsing
 
+                        /* debug
+                        for (int i = 0; i < num_contents; i++)
+                        {
+                                printf("contents: %s\n", contents[i]);
+                        }
+                        */
+
                         // error checking
                         for (int i = 0; i < num_contents; i++) // check for blank processes
                         {
-                                if (!strcmp(contents[i], ""))
+                                if (is_spaces(contents[i]))
                                 {
                                         error_message(ERR_MISSING_CMD);
                                         ERROR_THROWN = 1;
@@ -273,7 +296,7 @@ int main(void)
                         }
                         if (!(ERROR_THROWN) && index_output_redirect > 0) // check for missing file names
                         {
-                                if (strcmp(contents[index_output_redirect - 1], "") && !strcmp(contents[index_output_redirect + 1], ""))
+                                if (!is_spaces(contents[index_output_redirect - 1]) && is_spaces(contents[index_output_redirect + 1]))
                                 {
                                         error_message(ERR_MISSING_FILE);
                                         ERROR_THROWN = 1;
@@ -355,7 +378,7 @@ int main(void)
                                 }
                         }
 
-                        /* debugging
+                        /*
                         for (int i = 0; i < num_processes; i++)
                         {
                                 int k = process_args_and_items_count[i].my_num_items;
@@ -377,17 +400,22 @@ int main(void)
 
                         if (!ERROR_THROWN) // input has no errors; we execute the commands
                         {
-                                if (num_metachar == 0)
+                                if (num_metachar == 0) // no > or &
                                 {
                                         if (!strcmp(process_args_and_items_count[0].my_process_args[0], "cd"))
                                         {
                                                 if (chdir(process_args_and_items_count[0].my_process_args[1]) < 0) // set process's working directory to file name specified by 2nd argument
                                                 {
-                                                        retval = 1;
+                                                        retval[num_retval] = 1;
+                                                        num_retval++;
                                                         error_message(ERR_CANT_CD_DIR); // error if not successful
                                                 }
+                                                else
+                                                {
+                                                        retval[num_retval] = 0;
+                                                        num_retval++;
+                                                }
                                         }
-
                                         else
                                         {
                                                 pid_t pid = fork(); // fork, creating child process
@@ -402,9 +430,42 @@ int main(void)
                                                 else if (pid != 0) // parent
                                                 {
                                                         int child_status;
-                                                        waitpid(pid, &child_status, 0);     // wait for child to finishing executing, then parent continue operation
-                                                        retval = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
+                                                        waitpid(pid, &child_status, 0);                 // wait for child to finishing executing, then parent continue operation
+                                                        retval[num_retval] = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
+                                                        num_retval++;
                                                 }
+                                        }
+                                }
+                                else if (num_metachar == num_output_redirec_signs) // >*
+                                {
+                                        pid_t pid = fork(); // fork, creating child process
+                                        if (pid == 0)       // child
+                                        {
+                                                int fd;
+
+                                                if ((fd = open(process_args_and_items_count[1].my_process_args[0], O_WRONLY | O_TRUNC | O_CREAT, 0644)) < 0)
+                                                {
+                                                        error_message(ERR_CANT_OPEN_FILE);
+                                                }
+                                                dup2(fd, STDOUT_FILENO);
+                                                if (!strcmp(metachar[0], ">&")) // >
+                                                {
+                                                        dup2(fd, STDERR_FILENO);
+                                                }
+
+                                                if (execvp(process_args_and_items_count[0].my_process_args[0], process_args_and_items_count[0].my_process_args) < 0)
+                                                {
+                                                        error_message(ERR_CMD_NOTFOUND); // error if not successful
+                                                }
+                                                close(fd);
+                                                exit(0); // try to exit with exit successful flag
+                                        }
+                                        else if (pid != 0) // parent
+                                        {
+                                                int child_status;
+                                                waitpid(pid, &child_status, 0);                 // wait for child to finishing executing, then parent continue operation
+                                                retval[num_retval] = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
+                                                num_retval++;
                                         }
                                 }
                         }
@@ -412,7 +473,22 @@ int main(void)
 
                 if (!(ERROR_THROWN) && strcmp(cmd, ""))
                 {
-                        fprintf(stderr, "+ completed '%s': %d\n", cmd, retval); // prints exit status of child
+                        fprintf(stderr, "+ completed '%s'", cmd); // prints exit status of child
+
+                        if (num_retval == 1)
+                        {
+                                fprintf(stderr, " ");
+                        }
+                        else
+                        {
+                                fprintf(stderr, ": ");
+                        }
+
+                        for (int i = 0; i < num_retval; i++)
+                        {
+                                fprintf(stderr, "[%d]", retval[i]);
+                        }
+                        fprintf(stderr, "\n");
                 }
         }
 
