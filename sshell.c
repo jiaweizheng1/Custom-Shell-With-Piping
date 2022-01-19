@@ -364,12 +364,12 @@ int main(void)
                         }
 
                         /*
-                        for (int i = 1; i < num_processes; i++)
+                        for (int i = 0; i < num_processes; i++)
                         {
-                                int k = 17;
+                                int k = arr_args_and_count[i].my_num_items;
                                 for (int j = 0; j < k; j++)
                                 {
-                                        printf("args: %s\n", arr_args_and_count[i].my_process_args[j]);
+                                        printf("args%d: %s\n", i, arr_args_and_count[i].my_process_args[j]);
                                 }
                         }
                         for (int i = 0; i < num_metachar; i++)
@@ -461,9 +461,9 @@ int main(void)
                                                         }
                                                         exit(0); // try to exit with exit successful flag
                                                 }
-                                                else if (pid < 0) // if fork failed
+                                                else if (pid < 0) // if Fork failure
                                                 {
-                                                        fprintf(stderr, "Fork failed.\n");
+                                                        fprintf(stderr, "Fork failure.\n");
                                                         return EXIT_FAILURE;
                                                 }
                                                 else // parent
@@ -501,9 +501,9 @@ int main(void)
                                                 close(fd);
                                                 exit(0); // try to exit with exit successful flag
                                         }
-                                        else if (pid < 0) // if fork failed
+                                        else if (pid < 0) // if Fork failure
                                         {
-                                                fprintf(stderr, "Fork failed.\n");
+                                                fprintf(stderr, "Fork failure.\n");
                                                 return EXIT_FAILURE;
                                         }
                                         else // parent
@@ -514,57 +514,97 @@ int main(void)
                                                 num_retval++;
                                         }
                                 }
+                                // with help from https://stackoverflow.com/questions/8082932/connecting-n-commands-with-pipes-in-a-shell
                                 else // either commands with | signs or commands with | signs and > signs
                                 {
-                                        int index_command = 0;
-                                        int index_pid = 0;
-                                        pid_t pid[RETVAL_MAX];
+                                        pid_t pid;
                                         int child_status;
 
-                                        for (int i = 0; i < num_pipe_signs; i++)
+                                        pid = fork();
+                                        if (pid == 0)
                                         {
-                                                pid[index_pid] = fork();
-                                                index_pid++;
-                                                index_command++;
-                                        }
-                                        if (pid == 0) // child
-                                        {
-                                                execvp(arr_args_and_count[index_command].my_process_args[0], arr_args_and_count[index_command].my_process_args);
-                                                exit(2);
-                                                /*
-                                                if (pid == 0) // child
-                                                {
-                                                        index_command++;
-                                                        close(fd[1]);
-                                                        dup2(fd[0], STDIN_FILENO);
-                                                        close(fd[0]);
-                                                        execvp(arr_args_and_count[index_command].my_process_args[0], arr_args_and_count[index_command].my_process_args);
-                                                        exit(0);
-                                                }
-                                                else // parent
-                                                {
-                                                        close(fd[0]);
-                                                        dup2(fd[1], STDOUT_FILENO);
-                                                        close(fd[1]);
-                                                        waitpid(pid, &child_status, 0); // wait for child to finishing executing, then parent continue operation
+                                                int i;
+                                                int in;
+                                                int fd[2];
 
-                                                        exit(0);
+                                                /* The first process should get its input from the original file descriptor 0.  */
+                                                in = 0;
+
+                                                /* Note the loop bound, we spawn here all, but the last stage of the pipeline.  */
+                                                for (i = 0; i < num_pipe_signs; ++i)
+                                                {
+                                                        pipe(fd);
+
+                                                        /* f [1] is the write end of the pipe, we carry `in` from the prev iteration.  */
+                                                        if ((pid = fork()) == 0)
+                                                        {
+                                                                if (in != 0)
+                                                                {
+                                                                        dup2(in, 0);
+                                                                        close(in);
+                                                                }
+
+                                                                if (fd[1] != 1)
+                                                                {
+                                                                        dup2(fd[1], 1);
+                                                                        close(fd[1]);
+                                                                }
+
+                                                                if (execvp(arr_args_and_count[i].my_process_args[0], arr_args_and_count[i].my_process_args) < 0)
+                                                                {
+                                                                        error_message(ERR_CMD_NOTFOUND); // error if not successful
+                                                                        exit(1);
+                                                                }
+                                                                exit(0);
+                                                        }
+
+                                                        /* No need for the write end of the pipe, the child will write here.  */
+                                                        close(fd[1]);
+
+                                                        /* Keep the read end of the pipe, the next child will read from there.  */
+                                                        in = fd[0];
                                                 }
-                                                */
+
+                                                /* Last stage of the pipeline - set stdin be the read end of the previous pipe
+                                                   and output to the original file descriptor 1. */
+                                                if (in != 0)
+                                                        dup2(in, 0);
+
+                                                int filename;
+
+                                                if (num_output_redirec_signs > 0)
+                                                {
+                                                        if ((filename = open(arr_args_and_count[num_processes - 1].my_process_args[0], O_WRONLY | O_TRUNC | O_CREAT, 0644)) < 0)
+                                                        {
+                                                                error_message(ERR_CANT_OPEN_FILE);
+                                                                exit(1);
+                                                        }
+                                                        dup2(filename, STDOUT_FILENO);
+                                                        if (!strcmp(metachar[num_metachar - 1], ">&")) // >
+                                                        {
+                                                                dup2(filename, STDERR_FILENO);
+                                                        }
+                                                }
+
+                                                /* Execute the last stage with the current process. */
+                                                if (execvp(arr_args_and_count[i].my_process_args[0], arr_args_and_count[i].my_process_args) < 0)
+                                                {
+                                                        error_message(ERR_CMD_NOTFOUND); // error if not successful
+                                                        exit(1);
+                                                }
+                                                close(filename);
+                                                exit(0);
                                         }
-                                        else if (pid[0] < 0) // if fork failed
+                                        else if (pid < 0) // if Fork failure
                                         {
-                                                fprintf(stderr, "Fork failed.\n");
+                                                fprintf(stderr, "Fork failure.\n");
                                                 return EXIT_FAILURE;
                                         }
                                         else // parent
                                         {
-                                                for (int i = 0; i < num_pipe_signs; i++)
-                                                {
-                                                        waitpid(pid[i], &child_status, 0);              // wait for child to finishing executing, then parent continue operation
-                                                        retval[num_retval] = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
-                                                        num_retval++;
-                                                }
+                                                waitpid(pid, &child_status, 0);                 // wait for child to finishing executing, then parent continue operation
+                                                retval[num_retval] = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
+                                                num_retval++;
                                         }
                                 }
                         }
@@ -593,22 +633,3 @@ int main(void)
 
         return EXIT_SUCCESS;
 }
-
-/*
-                                                if (pid == 0) // child
-                                                {
-                                                        close(fd[1]);
-                                                        dup2(fd[0], STDIN_FILENO);
-                                                        close(fd[0]);
-                                                        execvp(arr_args_and_count[index_command].my_process_args[0], arr_args_and_count[index_command].my_process_args);
-                                                        exit(0);
-                                                }
-                                                else // parent
-                                                {
-                                                        close(fd[0]);
-                                                        dup2(fd[1], STDOUT_FILENO);
-                                                        close(fd[1]);
-                                                        execvp(arr_args_and_count[index_command].my_process_args[0], arr_args_and_count[index_command].my_process_args);
-                                                        exit(0);
-                                                }
-                                                */
