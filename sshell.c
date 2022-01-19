@@ -1,32 +1,32 @@
 /* TO DO
--recomment due to change of parsing
+-recomment due to change of parsing and new code
 -report
 */
 
-#include <ctype.h> // isspace function
-#include <dirent.h>
-#include <fcntl.h>
+#include <ctype.h>  // isspace function
+#include <dirent.h> // directory functions
+#include <fcntl.h>  // open function for files
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
+#include <sys/stat.h> // file stats function
 #include <sys/wait.h> // to access waitpid function
-#include <unistd.h>   // open file function
+#include <unistd.h>   // piping
 
+#define ARGS_MAX 17 // base on specifications + 1 extra for NULL
 #define CMDLINE_MAX 512
-#define PROCESS_MAX 5                           // up to 3 pipe signs or 4 processes + 1 output redirection
-#define METACHAR_MAX 4                          // up to 3 pipe signs + 1 output redirection sign
 #define CONTENTS_MAX PROCESS_MAX + METACHAR_MAX // 5 process + 4 meta char
-#define ARGS_MAX 17                             // base on specifications + 1 extra for NULL
-#define RETVAL_MAX 4                            // 3 pipe signs so max of 4 return values
+#define METACHAR_MAX 4                          // up to 3 pipe signs + 1 output redirection sign
+#define PROCESS_MAX 5                           // up to 3 pipe signs or 4 processes + 1 output redirection
+#define RETVAL_MAX 4                            // 3 pipe signs so max of 4 return values; output redirect doesnt count
+
+struct stat stat_buff; // sls stat()wont work if not global
 
 struct mystruct
 {
         char *my_process_args[ARGS_MAX];
         int my_num_items;
 };
-
-struct stat stat_buff;
 
 int is_spaces(char const *chr)
 {
@@ -51,15 +51,15 @@ char *my_strtok(char *string, char const *delimiter)
 
         if (string != NULL) // if not done, continue finding delimiters
                 ptr_source = string;
-        if (ptr_source == NULL)
-                return NULL; // done... found all delimiters
+        if (ptr_source == NULL) // done... no more parsing left to do
+                return NULL;
 
         if ((ptr_delimiter = strpbrk(ptr_source, delimiter)) != NULL) // locate delimiters
         {
-                *ptr_delimiter = 0;
+                *ptr_delimiter = 0; // like strtok, set a reference point for where next to continue
                 ptr_ret = ptr_source;
                 ptr_delimiter++;
-                ptr_source = ptr_delimiter;
+                ptr_source = ptr_delimiter; // set new starting point for next parse call
         }
 
         return ptr_ret;
@@ -99,7 +99,7 @@ char *removeleadspaces(char *str, int *spacesremoved)
         {
                 ret_str[ret_str_index] = str[str_index];
         }
-        ret_str[ret_str_index] = '>';      // add extra > for easier parsing
+        ret_str[ret_str_index] = '>';      // add extra > for easier parsing for my_strtok
         ret_str[ret_str_index + 1] = '\0'; // add newline on last index to signify end of string
         *spacesremoved += num_spaces;
 
@@ -152,6 +152,8 @@ void error_message(int error_code)
 int main(void)
 {
         char cmd[CMDLINE_MAX];
+        struct mystruct arr_args_and_count[PROCESS_MAX]; // my struct of array of array of args(broken down from process)
+        memset(arr_args_and_count, 0, sizeof(arr_args_and_count));
 
         while (1)
         {
@@ -199,7 +201,7 @@ int main(void)
                         int num_output_redirec_signs = 0;
                         int index_output_redirect = -1; // initially, not set
                         char delimiter[] = "|>";        // we want to parse the string, ignoring all spaces, >, and |
-                        int skip_and_sign = 0;
+                        int skip_and_sign = 0;          // bool for skipping & sign because our delimiter is only | and >
                         char *ptr_process;
                         char *ptr_metachar;
 
@@ -286,12 +288,13 @@ int main(void)
                                         ERROR_THROWN = 1;
                                 }
                         }
-                        if (!(ERROR_THROWN)) // check for mislocated output redirection sign
+                        if (!(ERROR_THROWN) && index_output_redirect > 0) // check for mislocated output redirection sign
                         {
                                 for (int i = 0; i < num_contents; i++)
                                 {
                                         if (contents[i][0] == '|' && i > index_output_redirect)
                                         {
+                                                open(contents[i - 1], O_WRONLY | O_TRUNC | O_CREAT, 0644);
                                                 error_message(ERR_MISLOCATE_OUT_REDIRECTION);
                                                 ERROR_THROWN = 1;
                                                 break;
@@ -300,8 +303,6 @@ int main(void)
                         }
 
                         // start of process to args parsing
-                        struct mystruct process_args_and_items_count[PROCESS_MAX];                     // array of array of args(broken down from process)
-                        memset(process_args_and_items_count, 0, sizeof(process_args_and_items_count)); // reset mystruct
                         int num_processes = 0;
 
                         if (!ERROR_THROWN)
@@ -309,9 +310,9 @@ int main(void)
                                 // process -> args parsing
                                 for (int i = 0; i < num_contents; i++)
                                 {
-                                        if (contents[i][0] != '>' && contents[num_contents][0] != '|')
+                                        if (contents[i][0] != '>' && contents[i][0] != '|')
                                         {
-                                                process_args_and_items_count[num_processes].my_num_items = argsfunction(contents[i], process_args_and_items_count[num_processes].my_process_args);
+                                                arr_args_and_count[num_processes].my_num_items = argsfunction(contents[i], arr_args_and_count[num_processes].my_process_args);
                                                 num_processes++;
                                         }
                                 }
@@ -321,13 +322,13 @@ int main(void)
 
                                 if (num_metachar == 0) // one process and no file names
                                 {
-                                        num_args += process_args_and_items_count[0].my_num_items;
+                                        num_args += arr_args_and_count[0].my_num_items;
                                 }
                                 else if (num_pipe_signs > num_output_redirec_signs) // 3 pipe signs + 1 output redirect; only 1 file name
                                 {
                                         for (int i = 0; i < num_processes; i++)
                                         {
-                                                num_args += process_args_and_items_count[i].my_num_items; // file name is not considered a argument
+                                                num_args += arr_args_and_count[i].my_num_items; // file name is not considered a argument
                                         }
                                         num_args--; // subtract 1 file name from number of arguments
                                 }
@@ -335,7 +336,7 @@ int main(void)
                                 {
                                         for (int i = 0; i < num_processes; i++)
                                         {
-                                                num_args += process_args_and_items_count[i].my_num_items; // file name is not considered a argument
+                                                num_args += arr_args_and_count[i].my_num_items; // file name is not considered a argument
                                         }
                                         num_args -= num_output_redirec_signs;
                                 }
@@ -350,25 +351,25 @@ int main(void)
                                 // if output redirect, need additional parsing: "echo hello > file world" -> "echo hello world > file"
                                 if (num_output_redirec_signs > 0)
                                 {
-                                        int new_items_count = process_args_and_items_count[num_processes - 2].my_num_items;
+                                        int new_items_count = arr_args_and_count[num_processes - 2].my_num_items;
 
-                                        for (int prev_index = process_args_and_items_count[num_processes - 2].my_num_items, index = 1; index < process_args_and_items_count[num_processes - 1].my_num_items; prev_index++, index++)
+                                        for (int prev_index = arr_args_and_count[num_processes - 2].my_num_items, index = 1; index < arr_args_and_count[num_processes - 1].my_num_items; prev_index++, index++)
                                         {
-                                                process_args_and_items_count[num_processes - 2].my_process_args[prev_index] = process_args_and_items_count[num_processes - 1].my_process_args[index];
+                                                arr_args_and_count[num_processes - 2].my_process_args[prev_index] = arr_args_and_count[num_processes - 1].my_process_args[index];
                                                 new_items_count++;
                                         }
 
-                                        process_args_and_items_count[num_processes - 2].my_num_items = new_items_count;
+                                        arr_args_and_count[num_processes - 2].my_num_items = new_items_count;
                                 }
                         }
 
                         /*
-                        for (int i = 0; i < num_processes; i++)
+                        for (int i = 1; i < num_processes; i++)
                         {
-                                int k = process_args_and_items_count[i].my_num_items;
+                                int k = 17;
                                 for (int j = 0; j < k; j++)
                                 {
-                                        printf("args: %s\n", process_args_and_items_count[i].my_process_args[j]);
+                                        printf("args: %s\n", arr_args_and_count[i].my_process_args[j]);
                                 }
                         }
                         for (int i = 0; i < num_metachar; i++)
@@ -381,7 +382,7 @@ int main(void)
                         {
                                 // built-in command pwd
                                 // with help from https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
-                                if (!strcmp(process_args_and_items_count[0].my_process_args[0], "pwd"))
+                                if (!strcmp(arr_args_and_count[0].my_process_args[0], "pwd"))
                                 {
                                         char file_name[_PC_PATH_MAX];
                                         if (NULL != getcwd(file_name, sizeof(file_name))) // Prints out filename representing current directory.
@@ -396,14 +397,14 @@ int main(void)
                                         }
                                 }
                                 // builtin command exit
-                                if (!strcmp(process_args_and_items_count[0].my_process_args[0], "exit"))
+                                if (!strcmp(arr_args_and_count[0].my_process_args[0], "exit"))
                                 {
                                         fprintf(stderr, "Bye...\n");
                                         fprintf(stderr, "+ completed 'exit' [0]\n");
                                         exit(0);
                                 }
                                 // built-in command sls
-                                if (!strcmp(process_args_and_items_count[0].my_process_args[0], "sls"))
+                                if (!strcmp(arr_args_and_count[0].my_process_args[0], "sls"))
                                 {
                                         DIR *ptr_dir;
                                         struct dirent *ptr_dir_entry;
@@ -424,23 +425,23 @@ int main(void)
                                                 retval[num_retval] = 0;
                                                 num_retval++;
                                         }
-                                        else
+                                        else // unsucessful on opening up directory
                                         {
                                                 error_message(ERR_CANT_SLS_DIR);
                                                 retval[num_retval] = 1;
                                                 num_retval++;
                                         }
                                 }
-                                else if (num_metachar == 0) // no > or & in command
+                                else if (num_metachar == 0) // no > or & in command; normal commands including cd
                                 {
                                         // built-in command cd
-                                        if (!strcmp(process_args_and_items_count[0].my_process_args[0], "cd"))
+                                        if (!strcmp(arr_args_and_count[0].my_process_args[0], "cd"))
                                         {
-                                                if (chdir(process_args_and_items_count[0].my_process_args[1]) < 0) // set process's working directory to file name specified by 2nd argument
+                                                if (chdir(arr_args_and_count[0].my_process_args[1]) < 0) // set process's working directory to file name specified by 2nd argument
                                                 {
+                                                        error_message(ERR_CANT_CD_DIR); // error if not successful
                                                         retval[num_retval] = 1;
                                                         num_retval++;
-                                                        error_message(ERR_CANT_CD_DIR); // error if not successful
                                                 }
                                                 else
                                                 {
@@ -453,13 +454,19 @@ int main(void)
                                                 pid_t pid = fork(); // fork, creating child process
                                                 if (pid == 0)       // child
                                                 {
-                                                        if (execvp(process_args_and_items_count[0].my_process_args[0], process_args_and_items_count[0].my_process_args) < 0)
+                                                        if (execvp(arr_args_and_count[0].my_process_args[0], arr_args_and_count[0].my_process_args) < 0)
                                                         {
                                                                 error_message(ERR_CMD_NOTFOUND); // error if not successful
+                                                                exit(1);
                                                         }
                                                         exit(0); // try to exit with exit successful flag
                                                 }
-                                                else if (pid != 0) // parent
+                                                else if (pid < 0) // if fork failed
+                                                {
+                                                        fprintf(stderr, "Fork failed.\n");
+                                                        return EXIT_FAILURE;
+                                                }
+                                                else // parent
                                                 {
                                                         int child_status;
                                                         waitpid(pid, &child_status, 0);                 // wait for child to finishing executing, then parent continue operation
@@ -475,9 +482,10 @@ int main(void)
                                         {
                                                 int fd;
 
-                                                if ((fd = open(process_args_and_items_count[1].my_process_args[0], O_WRONLY | O_TRUNC | O_CREAT, 0644)) < 0)
+                                                if ((fd = open(arr_args_and_count[1].my_process_args[0], O_WRONLY | O_TRUNC | O_CREAT, 0644)) < 0)
                                                 {
                                                         error_message(ERR_CANT_OPEN_FILE);
+                                                        exit(1);
                                                 }
                                                 dup2(fd, STDOUT_FILENO);
                                                 if (!strcmp(metachar[0], ">&")) // >
@@ -485,19 +493,78 @@ int main(void)
                                                         dup2(fd, STDERR_FILENO);
                                                 }
 
-                                                if (execvp(process_args_and_items_count[0].my_process_args[0], process_args_and_items_count[0].my_process_args) < 0)
+                                                if (execvp(arr_args_and_count[0].my_process_args[0], arr_args_and_count[0].my_process_args) < 0)
                                                 {
                                                         error_message(ERR_CMD_NOTFOUND); // error if not successful
+                                                        exit(1);
                                                 }
                                                 close(fd);
                                                 exit(0); // try to exit with exit successful flag
                                         }
-                                        else if (pid != 0) // parent
+                                        else if (pid < 0) // if fork failed
+                                        {
+                                                fprintf(stderr, "Fork failed.\n");
+                                                return EXIT_FAILURE;
+                                        }
+                                        else // parent
                                         {
                                                 int child_status;
                                                 waitpid(pid, &child_status, 0);                 // wait for child to finishing executing, then parent continue operation
                                                 retval[num_retval] = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
                                                 num_retval++;
+                                        }
+                                }
+                                else // either commands with | signs or commands with | signs and > signs
+                                {
+                                        int index_command = 0;
+                                        int index_pid = 0;
+                                        pid_t pid[RETVAL_MAX];
+                                        int child_status;
+
+                                        for (int i = 0; i < num_pipe_signs; i++)
+                                        {
+                                                pid[index_pid] = fork();
+                                                index_pid++;
+                                                index_command++;
+                                        }
+                                        if (pid == 0) // child
+                                        {
+                                                execvp(arr_args_and_count[index_command].my_process_args[0], arr_args_and_count[index_command].my_process_args);
+                                                exit(2);
+                                                /*
+                                                if (pid == 0) // child
+                                                {
+                                                        index_command++;
+                                                        close(fd[1]);
+                                                        dup2(fd[0], STDIN_FILENO);
+                                                        close(fd[0]);
+                                                        execvp(arr_args_and_count[index_command].my_process_args[0], arr_args_and_count[index_command].my_process_args);
+                                                        exit(0);
+                                                }
+                                                else // parent
+                                                {
+                                                        close(fd[0]);
+                                                        dup2(fd[1], STDOUT_FILENO);
+                                                        close(fd[1]);
+                                                        waitpid(pid, &child_status, 0); // wait for child to finishing executing, then parent continue operation
+
+                                                        exit(0);
+                                                }
+                                                */
+                                        }
+                                        else if (pid[0] < 0) // if fork failed
+                                        {
+                                                fprintf(stderr, "Fork failed.\n");
+                                                return EXIT_FAILURE;
+                                        }
+                                        else // parent
+                                        {
+                                                for (int i = 0; i < num_pipe_signs; i++)
+                                                {
+                                                        waitpid(pid[i], &child_status, 0);              // wait for child to finishing executing, then parent continue operation
+                                                        retval[num_retval] = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
+                                                        num_retval++;
+                                                }
                                         }
                                 }
                         }
@@ -526,3 +593,22 @@ int main(void)
 
         return EXIT_SUCCESS;
 }
+
+/*
+                                                if (pid == 0) // child
+                                                {
+                                                        close(fd[1]);
+                                                        dup2(fd[0], STDIN_FILENO);
+                                                        close(fd[0]);
+                                                        execvp(arr_args_and_count[index_command].my_process_args[0], arr_args_and_count[index_command].my_process_args);
+                                                        exit(0);
+                                                }
+                                                else // parent
+                                                {
+                                                        close(fd[0]);
+                                                        dup2(fd[1], STDOUT_FILENO);
+                                                        close(fd[1]);
+                                                        execvp(arr_args_and_count[index_command].my_process_args[0], arr_args_and_count[index_command].my_process_args);
+                                                        exit(0);
+                                                }
+                                                */
