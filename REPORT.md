@@ -28,37 +28,37 @@ This program follows a few steps in order to achieve basic shell functionality.
 
 ### Output Redirection
 
-In the event the characters '>' or '>&' are present, output redirection        
-occurs. Output redirection is performed with the dup2() and fork() system 
-calls.                                                                         
+In the event the characters '>' or '>&' are present, output redirection    
+occurs. Output redirection is performed with the dup2() and fork() system
+calls.
 
-The fork() system call creates a new process, known as the child process, that 
-will execute the next command. The program will check what the current process 
+The fork() system call creates a new process, known as the child process, that
+will execute the next command. The program will check what the current process
 ID is, in order to determine the proper process (parent or child).
 
-The dup2() system call duplicates a file descriptor. It receives two file 
-descriptors as arguments. The second argument is the file descriptor that the 
+The dup2() system call duplicates a file descriptor. It receives two file
+descriptors as arguments. The second argument is the file descriptor that the
 first argument will be duplicated into.
 
-In the event of output redirection, the program will call fork(), which will  
-create a child process. The child process will open or create a file for  
-output to be redirected into. open() will return a file descriptor. The dup2() 
-call will then replace the file descriptor with the standard output. If the 
-metacharacter '>&' was present, the standard error will be similarly 
-duplicated. Upon execution of the command, the output will then be redirected 
+In the event of output redirection, the program will call fork(), which will
+create a child process. The child process will open or create a file for
+output to be redirected into. open() will return a file descriptor. The dup2()
+call will then replace the file descriptor with the standard output. If the
+metacharacter '>&' was present, the standard error will be similarly
+duplicated. Upon execution of the command, the output will then be redirected
 into the file.
 
 ### Piping
 
-In the event the characters '|' or '|&' are present, piping occurs. Piping is 
-achieved through many of the same system calls as output redirection, such as 
+In the event the characters '|' or '|&' are present, piping occurs. Piping is
+achieved through many of the same system calls as output redirection, such as
 the dup2() and fork() system calls.
 
 In piping, both the fork() and dup2() system calls function in similar ways to 
 their usage in output redirection. The dup2() system calls does however vary 
 slightly in piping. Rather than duplicating the file descriptor of a file to 
 the standard output (and standard error), the standard output file descriptor 
-of the first (or previous) command is duplicated as the standard input 
+of the first (or previous) command is duplicated as the standard input
 descriptor of the second (or next) command.
 
 ## References
