@@ -1,10 +1,10 @@
 #include <ctype.h>  // isspace function
 #include <dirent.h> // directory functions
-#include <fcntl.h>  // open function for files
+#include <fcntl.h>  // open() function for files
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h> // file stats function
+#include <sys/stat.h> // file stats function for file size in bytes
 #include <sys/wait.h> // to access waitpid function
 #include <unistd.h>   // piping
 
@@ -60,7 +60,7 @@ char *my_strtok(char *string, char const *delimiter)
         return ptr_ret;
 }
 
-int argsfunction(char *process, char *arg_array[ARGS_MAX]) // break process into smaller args for passing into execvp
+int argsfunction(char *process, char *arg_array[ARGS_MAX]) // helper function to break processes into smaller args for mystruct and passing into execvp
 {
         int index_args = 0;
         char delimiter[] = " ";
@@ -186,7 +186,7 @@ int main(void)
                 int num_spaces = 0;
                 cmd_cpy = removeleadspaces(cmd, &num_spaces);
 
-                if (!is_spaces(cmd)) // check if input is not empty
+                if (!is_spaces(cmd)) // if input is not empty, we continue
                 {
                         // start of contents parsing(for error checking) and meta char parsing
                         // with help from https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split
@@ -209,7 +209,7 @@ int main(void)
                         {
                                 if (skip_and_sign) // copy each process of cmd_copy to args array
                                 {
-                                        contents[num_contents] = ++ptr_process; // skip & sign
+                                        contents[num_contents] = ++ptr_process; // skip & sign if last delimiter detected was > of >& or | of |&
                                         skip_and_sign = 0;
                                 }
                                 else // copy each process of cmd_copy to args array
@@ -230,7 +230,7 @@ int main(void)
                                         }
                                         num_contents++;
                                         index_output_redirect = num_contents;
-                                        contents[num_contents] = ptr_metachar;
+                                        contents[num_contents] = ptr_metachar; // append to contents and metachar array at same time so we dont have to loop again
                                         metachar[num_metachar] = ptr_metachar;
                                         num_metachar++;
                                         num_output_redirec_signs++;
@@ -247,7 +247,7 @@ int main(void)
                                                 ptr_metachar = "|";
                                         }
                                         num_contents++;
-                                        contents[num_contents] = ptr_metachar;
+                                        contents[num_contents] = ptr_metachar; // append to contents and metachar array at same time so we dont have to loop again
                                         metachar[num_metachar] = ptr_metachar;
                                         num_metachar++;
                                         num_pipe_signs++;
@@ -286,10 +286,11 @@ int main(void)
                                 {
                                         if (contents[i][0] == '|' && i > index_output_redirect)
                                         {
-                                                if (((open(contents[i - 1], O_WRONLY | O_TRUNC | O_CREAT, 0644))) < 0)
+                                                if (((open(contents[i - 1], O_WRONLY | O_TRUNC | O_CREAT, 0644))) < 0) // aparently prof's shell creates the file while also throwing error
                                                 {
                                                         error_message(ERR_CANT_OPEN_FILE);
-                                                        exit(1);
+                                                        ERROR_THROWN = 1;
+                                                        break;
                                                 }
                                                 error_message(ERR_MISLOCATE_OUT_REDIRECTION);
                                                 ERROR_THROWN = 1;
@@ -344,6 +345,17 @@ int main(void)
                                         ERROR_THROWN = 1;
                                 }
 
+                                if (num_output_redirec_signs > 0) // if need to open file, try to open it first to check for errors; we will reopen later if its fine
+                                {
+                                        int filename;
+                                        if ((filename = open(arr_args_and_count[num_processes - 1].my_process_args[0], O_WRONLY | O_TRUNC | O_CREAT, 0644)) < 0)
+                                        {
+                                                error_message(ERR_CANT_OPEN_FILE);
+                                                ERROR_THROWN = 1;
+                                        }
+                                        close(filename);
+                                }
+
                                 // if output redirect, need additional parsing: "echo hello > file world" -> "echo hello world > file"
                                 if (num_output_redirec_signs > 0)
                                 {
@@ -365,8 +377,8 @@ int main(void)
                                 // with help from https://www.gnu.org/software/libc/manual/html_mono/libc.html#Working-Directory
                                 if (!strcmp(arr_args_and_count[0].my_process_args[0], "pwd"))
                                 {
-                                        char file_name[_PC_PATH_MAX];
-                                        if (NULL != getcwd(file_name, sizeof(file_name))) // Prints out filename representing current directory.
+                                        char dire_name[_PC_PATH_MAX];
+                                        if (getcwd(dire_name, sizeof(dire_name)) != NULL) // Prints out filename representing current directory.
                                         {
                                                 retval[num_retval] = 0;
                                                 num_retval++;
@@ -457,26 +469,23 @@ int main(void)
                                         pid_t pid = fork(); // fork, creating child process
                                         if (pid == 0)       // child
                                         {
-                                                int fd; // open file
-
-                                                if ((fd = open(arr_args_and_count[1].my_process_args[0], O_WRONLY | O_TRUNC | O_CREAT, 0644)) < 0)
+                                                int filename;
+                                                if (num_output_redirec_signs > 0) // if need to open file, try to open to see if there are errors
                                                 {
-                                                        error_message(ERR_CANT_OPEN_FILE);
-                                                        exit(1);
+                                                        filename = open(arr_args_and_count[num_processes - 1].my_process_args[0], O_WRONLY | O_TRUNC | O_CREAT, 0644);
+                                                        dup2(filename, STDOUT_FILENO);
+                                                        if (!strcmp(metachar[num_metachar - 1], ">&")) // >
+                                                        {
+                                                                dup2(filename, STDERR_FILENO);
+                                                        }
                                                 }
-                                                dup2(fd, STDOUT_FILENO);        // >
-                                                if (!strcmp(metachar[0], ">&")) // >&
-                                                {
-                                                        dup2(fd, STDERR_FILENO);
-                                                }
-
                                                 if (execvp(arr_args_and_count[0].my_process_args[0], arr_args_and_count[0].my_process_args) < 0)
                                                 {
                                                         error_message(ERR_CMD_NOTFOUND); // error if not successful
-                                                        close(fd);
+                                                        close(filename);
                                                         exit(1);
                                                 }
-                                                close(fd);
+                                                close(filename);
                                                 exit(0); // try to exit with exit successful flag
                                         }
                                         else if (pid < 0) // if Fork failure
@@ -487,17 +496,16 @@ int main(void)
                                         else // parent
                                         {
                                                 int child_status;
-                                                waitpid(pid, &child_status, 0);                 // wait for child to finishing executing, then parent continue operation
-                                                retval[num_retval] = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
+                                                waitpid(pid, &child_status, 0);           // wait for child to finishing executing, then parent continue operation
+                                                child_status = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
+                                                retval[num_retval] = child_status;
                                                 num_retval++;
                                         }
                                 }
                                 // with help from https://stackoverflow.com/questions/8082932/connecting-n-commands-with-pipes-in-a-shell
                                 else // either commands with | signs or commands with | signs and > signs
                                 {
-                                        pid_t pid;
-
-                                        pid = fork();
+                                        pid_t pid = fork();
                                         if (pid == 0)
                                         {
                                                 int i;
@@ -559,21 +567,15 @@ int main(void)
                                                         dup2(in, STDIN_FILENO);
 
                                                 int filename;
-
-                                                if (num_output_redirec_signs > 0) // open file if necessary
+                                                if (num_output_redirec_signs > 0) // if need to open file, try to open to see if there are errors
                                                 {
-                                                        if ((filename = open(arr_args_and_count[num_processes - 1].my_process_args[0], O_WRONLY | O_TRUNC | O_CREAT, 0644)) < 0)
-                                                        {
-                                                                error_message(ERR_CANT_OPEN_FILE);
-                                                                exit(1);
-                                                        }
+                                                        filename = open(arr_args_and_count[num_processes - 1].my_process_args[0], O_WRONLY | O_TRUNC | O_CREAT, 0644);
                                                         dup2(filename, STDOUT_FILENO);
                                                         if (!strcmp(metachar[num_metachar - 1], ">&")) // >
                                                         {
                                                                 dup2(filename, STDERR_FILENO);
                                                         }
                                                 }
-
                                                 // Execute the last command
                                                 if (execvp(arr_args_and_count[i].my_process_args[0], arr_args_and_count[i].my_process_args) < 0)
                                                 {
@@ -592,7 +594,7 @@ int main(void)
                                         else // parent
                                         {
                                                 int child_status;
-                                                waitpid(pid, &child_status, WUNTRACED);         // wait for child to finishing executing, then parent continue operation
+                                                waitpid(pid, &child_status, 0);                 // wait for child to finishing executing, then parent continue operation
                                                 retval[num_retval] = WEXITSTATUS(child_status); // WEXITSTATUS gets exit status of child and puts it into retval
                                                 num_retval++;
                                         }
