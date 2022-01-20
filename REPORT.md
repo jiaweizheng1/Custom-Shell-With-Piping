@@ -28,7 +28,7 @@ This program follows a few steps in order to achieve basic shell functionality.
 
 ### Output Redirection
 
-In the event the characters '>' or '>&' are present, output redirection    
+In the event the characters '>' or '>&' are present, output redirection 
 occurs. Output redirection is performed with the dup2() and fork() system
 calls.
 
