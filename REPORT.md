@@ -34,9 +34,14 @@ In piping, both the fork() and dup2() system calls function in similar ways to t
 
 ## References
 [Parsing - Trimming white space](https://www.geeksforgeeks.org/c-program-to-trim-leading-white-spaces-from-string/)
+
 [Parsing - strtok](https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/string-split)
+
 [Parsing - strtok delimiter](https://stackoverflow.com/questions/12460264/c-determining-which-delimiter-used-strtok)
+
 [Parsing - consecutive delimiters](https://stackoverflow.com/questions/26522583/c-strtok-skips-second-token-or-consecutive-delimiter)
+
 [Piping](https://stackoverflow.com/questions/8082932/connecting-n-commands-with-pipes-in-a-shell)
+
 [dup2](http://www.cs.loyola.edu/~jglenn/702/S2005/Examples/dup2.html)
 
