@@ -1,5 +1,0 @@
-make --dry-run --always-make --keep-going --print-directory
-make: Entering directory '/home/jiawei/Documents/ECS150/Project1'
-gcc -Wall -Wextra -Werror sshell.c -o sshell
-make: Leaving directory '/home/jiawei/Documents/ECS150/Project1'
- 
