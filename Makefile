@@ -7,4 +7,4 @@ sshell: sshell.c
 .PHONY: clean
 clean:
 	rm sshell
-	rm *.txt
+	rm -f $(patsubst %.pdf,%.txt,$(wildcard *.pdf))
