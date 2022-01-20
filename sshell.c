@@ -555,12 +555,25 @@ int main(void)
                                                         in = fd[0];
                                                         num_pid++;
                                                 }
-                                                for (int i = 0; i < num_pid; i++) // wait for children
+                                                if (!strcmp(arr_args_and_count[0].my_process_args[0], "cat"))
                                                 {
-                                                        int status;
-                                                        waitpid(pid[num_pid], &status, 0);
-                                                        status = WEXITSTATUS(status);
-                                                        write(retfd[1], &status, sizeof(status));
+                                                        for (int i = 0; i < num_pid; i++) // wait for children
+                                                        {
+                                                                int status;
+                                                                waitpid(pid[num_pid], &status, 0);
+                                                                status = WEXITSTATUS(status);
+                                                                write(retfd[1], &status, sizeof(status));
+                                                        }
+                                                }
+                                                else
+                                                {
+                                                        for (int i = 0; i < num_pid; i++) // wait for children
+                                                        {
+                                                                int status;
+                                                                waitpid(pid[i], &status, 0);
+                                                                status = WEXITSTATUS(status);
+                                                                write(retfd[1], &status, sizeof(status));
+                                                        }
                                                 }
 
                                                 if (in != STDIN_FILENO) // last process receives input from pipe
@@ -604,17 +617,8 @@ int main(void)
 
                 if (!(ERROR_THROWN) && !is_spaces(cmd))
                 {
-                        fprintf(stderr, "+ completed '%s'", cmd); // prints exit status of child
-
-                        if (num_retval == 1)
-                        {
-                                fprintf(stderr, " ");
-                        }
-                        else
-                        {
-                                fprintf(stderr, ": ");
-                        }
-                        for (int i = 0; i < num_pipe_signs; i++) // prints ret values of pipelines
+                        fprintf(stderr, "+ completed '%s' ", cmd); // prints exit status of child
+                        for (int i = 0; i < num_pipe_signs; i++)   // prints ret values of pipelines
                         {
                                 int status;
                                 read(retfd[0], &status, sizeof(status));
