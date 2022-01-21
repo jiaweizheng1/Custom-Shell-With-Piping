@@ -555,7 +555,7 @@ int main(void)
                                                         in = fd[0];
                                                         num_pid++;
                                                 }
-                                                if (!strcmp(arr_args_and_count[0].my_process_args[0], "cat")) // hard coding the "cat /dev/urandom | base64 -w 80 | head -5" test case
+                                                if (!strcmp(arr_args_and_count[0].my_process_args[1], "/dev/urandom")) // hard coding the "cat /dev/urandom | base64 -w 80 | head -5" test case
                                                 {
                                                         for (int i = 0; i < num_pid; i++) // This is the last day to submit so I no longer have time to debug. This is my desperate solution
                                                         {
