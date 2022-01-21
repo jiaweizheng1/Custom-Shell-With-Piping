@@ -17,7 +17,7 @@
 
 struct stat stat_buff; // sls stat() wont work if not global
 
-struct mystruct // my struct for passing args into execvp
+struct args_execvp_struct // my struct for passing args into execvp
 {
         char *my_process_args[ARGS_MAX];
         int my_num_items;
@@ -60,7 +60,7 @@ char *my_strtok(char *string, char const *delimiter)
         return ptr_ret;
 }
 
-int argsfunction(char *process, char *arg_array[ARGS_MAX]) // helper function to break processes into smaller args for mystruct and passing into execvp
+int argsfunction(char *process, char *arg_array[ARGS_MAX]) // helper function to break processes into smaller args for args_execvp_struct and passing into execvp
 {
         int index_args = 0;
         char delimiter[] = " ";
@@ -150,7 +150,7 @@ int main(void)
 
         while (1)
         {
-                struct mystruct arr_args_and_count[PROCESS_MAX];           // my struct of array of array of args(broken down from process)
+                struct args_execvp_struct arr_args_and_count[PROCESS_MAX]; // my struct of array of array of args(broken down from process)
                 memset(arr_args_and_count, 0, sizeof(arr_args_and_count)); // set to 0's or reset for reuse
                 int retfd[2];
                 pipe(retfd); // shared pipe for return values of processes in a pipeline
@@ -555,25 +555,12 @@ int main(void)
                                                         in = fd[0];
                                                         num_pid++;
                                                 }
-                                                if (!strcmp(arr_args_and_count[0].my_process_args[1], "/dev/urandom")) // hard coding the "cat /dev/urandom | base64 -w 80 | head -5" test case
+                                                for (int i = 0; i < num_pid; i++) // wait for children
                                                 {
-                                                        for (int i = 0; i < num_pid; i++) // This is the last day to submit so I no longer have time to debug. This is my desperate solution
-                                                        {
-                                                                int status;
-                                                                waitpid(pid[num_pid], &status, 0); // I think this has to do with my implementation of fork() for loop?
-                                                                status = WEXITSTATUS(status);
-                                                                write(retfd[1], &status, sizeof(status));
-                                                        }
-                                                }
-                                                else
-                                                {
-                                                        for (int i = 0; i < num_pid; i++) // wait for children
-                                                        {
-                                                                int status;
-                                                                waitpid(pid[i], &status, 0);
-                                                                status = WEXITSTATUS(status);
-                                                                write(retfd[1], &status, sizeof(status));
-                                                        }
+                                                        int status;
+                                                        waitpid(pid[i], &status, 0);
+                                                        status = WEXITSTATUS(status);
+                                                        write(retfd[1], &status, sizeof(status));
                                                 }
 
                                                 if (in != STDIN_FILENO) // last process receives input from pipe
